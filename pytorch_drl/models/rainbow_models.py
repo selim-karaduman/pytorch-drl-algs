@@ -215,3 +215,4 @@ class DuelingRainbowNetwork(nn.Module):
         advantage = self.advantage(x)
         value = self.value(x)
         return value + (advantage - advantage.mean())
+

@@ -305,3 +305,4 @@ class Rainbow:
         for param1, param2 in zip(self.online_net.parameters(),
                                   self.target_net.parameters()):
             param2.data.copy_((1-self.tau)*param2 + self.tau*param1)
+
