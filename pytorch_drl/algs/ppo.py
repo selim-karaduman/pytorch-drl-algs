@@ -46,6 +46,7 @@ class PPO:
             self.optimizer = torch.optim.Adam(self.ppo_net.parameters(), lr=lr)
         
         self.envs = ParallelEnv(env_id, n=n_env)
+        self.cur_tr_step = self.envs.reset()
         self.max_grad_norm = max_grad_norm
         self.critic_coef = critic_coef
         self.entropy_coef = entropy_coef
@@ -73,7 +74,8 @@ class PPO:
         rewards = []
         dones = []
         values = []
-        state = self.envs.reset()
+        
+        state = self.cur_tr_step
         for i in range(tmax):
             state = torch.from_numpy(state).float().to(device)
             action, log_prob, critic_val = self._sample_action(state)
@@ -89,6 +91,7 @@ class PPO:
             state = next_state
             
         # extend values for H+1
+        self.cur_tr_step = state
         state = torch.from_numpy(state).float().to(device)
         with torch.no_grad():
             actor_dist, final_v = self.ppo_net(state)
@@ -108,7 +111,6 @@ class PPO:
             gae = delta + gae * self.gamma * self.tau * (1 - dones[t])
             
             advantages.insert(0, gae)
-            #v_targs.insert(0, gae + self.values[t])
             v_targs.insert(0, fut_ret)
         
         advantages = torch.cat(advantages)
