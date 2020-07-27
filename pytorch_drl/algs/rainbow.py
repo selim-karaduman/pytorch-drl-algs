@@ -40,7 +40,7 @@ class Rainbow:
                  pr_alpha = 0.2,
                  tau = 1e-3,
                  device = "cpu",
-                 
+                 eps_schedule=LinearSchedule(1.0, 0.01, 1e4)
                  ):
 
         self.gamma = gamma
@@ -66,6 +66,7 @@ class Rainbow:
         self.device = device
         self.n_replay = n_replay
         self.experience_index = 0
+        self.eps_schedule = eps_schedule
 
         if quantile_regression:
             self.tau_hat = (torch.arange(n_quants, dtype=torch.float)/n_quants 
@@ -151,16 +152,19 @@ class Rainbow:
             action = self.online_net(state).argmax(1).item()
         return action
 
-    def act(self, state, eps=None):
-        if (not self.noisy) and (eps is not None) and (random.random() < eps):
+    def act(self, state, test=False):
+        eps = self.eps_schedule.value
+        if (not self.noisy) and (not test) and (random.random() < eps):
             action = random.choice(np.arange(self.action_size))
         else:
-            if eps is None: # test
+            if test: # test
                 self.online_net.eval()
             with torch.no_grad():
                 action = self.get_best_action(state)
-            if eps is None:
+            if test:
                 self.online_net.train()
+
+        self.eps_schedule.step()
         return action
 
     def learn_expected(self, experiences):
