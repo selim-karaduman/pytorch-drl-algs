@@ -114,7 +114,7 @@ class DDPG:
         with torch.no_grad():
             action = self.policy_net(state)
         action = action.squeeze(0).detach().cpu().numpy()
-        if (not test) and (self.noise_process is not None): #TODO: clipping before or after
+        if (not test) and (self.noise_process is not None):
             action = action + self.noise_process.step()
         action = np.clip(action, -1, 1)
         return self.nn_to_action(action)

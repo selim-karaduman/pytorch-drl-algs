@@ -7,13 +7,10 @@ def train_episode(agent, env, max_t, eps, render=False):
     state = env.reset()
     score = 0
     for t in range(max_t):
-        #print("state:", state)
         action = agent.act(state)
-        #print("act:",action)
         if render:
             env.render()
         next_state, reward, done, _ = env.step(action)
-        #print("nsstate:",next_state)
         agent.step(state, action, reward, next_state, done)
         state = next_state
         score += reward
