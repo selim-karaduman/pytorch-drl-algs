@@ -2,11 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class PPOPolicyNetwork(nn.Module):
+class ACERModel(nn.Module):
 
     def __init__(self, state_size, action_size, seed=0):
-        super(PPOPolicyNetwork, self).__init__()
+        super(ACERModel, self).__init__()
         self.seed = torch.manual_seed(seed)    
+        
         self.actor = nn.Sequential(
             nn.Linear(state_size, 128),
             nn.Tanh(),
@@ -21,12 +22,10 @@ class PPOPolicyNetwork(nn.Module):
             nn.Tanh(),
             nn.Linear(128, 128),
             nn.Tanh(),
-            nn.Linear(128, 1)
+            nn.Linear(128, action_size)
         )
       
     def forward(self, state):
-        ac_probs =  self.actor(state)
+        policy =  self.actor(state)
         value = self.critic(state)
-        dist = torch.distributions.Categorical(ac_probs)
-        return dist, value
-
+        return policy, value

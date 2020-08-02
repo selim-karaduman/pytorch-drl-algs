@@ -112,6 +112,7 @@ class PPO:
             
             advantages.insert(0, gae)
             v_targs.insert(0, fut_ret)
+            #: gae + value[t]
         
         advantages = torch.cat(advantages)
         if self.normalize_rewards:

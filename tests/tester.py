@@ -18,6 +18,9 @@ def train_episode(agent, env, max_t, eps, render=False):
             return score
     return score
 
+"""
+This is for DQN
+"""
 def train_agent(agent, env, max_t, n_episodes, alg_name, eps_start=1.0, 
                 eps_end=0.01, eps_horizon=1350, max_score=195.0,
                 render_freq=None, log=True, test_freq=None):

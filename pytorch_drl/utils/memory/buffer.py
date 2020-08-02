@@ -123,3 +123,60 @@ class PriorityBuffer(UniformBuffer):
         weights = weights / max_weight
         weights = weights.unsqueeze(1).to(device)
         return (states, actions, rewards, next_states, dones, indices, weights)
+
+
+#-----------------------------------------------------------------------------
+
+
+class EpisodicBuffer:
+
+    def __init__(self, size, seed, device, batch_size, action_type=torch.long):
+        self.size = size
+        self.seed = seed
+        self.device = device
+        self.batch_size = batch_size
+        self.action_type = action_type
+        self.buffer = deque(maxlen=size)
+        
+
+    def add(self, trajectory):
+        """
+        trajectory: [[s1,s2,..sn], [a..], [r..], [p..], [d...]]
+        s: np.array
+        a: int
+        r: float
+        p: np.array
+        d: bool
+        """
+        self.buffer.append(trajectory)
+        # Return this same trajectory in the same format as self.sample()
+        return self.sample(batch=[trajectory])
+
+    def sample(self, batch=None):
+        device = self.device
+        if batch is None:
+            indices = np.random.choice(len(self.buffer), 
+                                        self.batch_size, replace=False)
+            batch = [self.buffer[ind] for ind in indices]
+        
+        batch = [map(np.vstack, tr) for tr in batch]
+        states, actions, rewards, policies, dones = (
+            map(lambda x: x.swapaxes(0,1), 
+                map(np.stack, 
+                    zip(*batch)))
+            )
+        """
+        states: n_steps x batch_size x [state_size]
+        """
+        
+        states = torch.from_numpy(states).float().to(device)
+        actions = torch.from_numpy(actions).type(self.action_type).to(device)
+        rewards = torch.from_numpy(rewards).float().to(device)
+        policies = torch.from_numpy(policies).float().to(device)
+        dones = torch.from_numpy(dones.astype(np.uint8)).float().to(device)
+        return states, actions, rewards, policies, dones
+
+
+    def __len__(self):
+        return len(self.buffer)
+
