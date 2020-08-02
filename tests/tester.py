@@ -23,7 +23,7 @@ This is for DQN
 """
 def train_agent(agent, env, max_t, n_episodes, alg_name, eps_start=1.0, 
                 eps_end=0.01, eps_horizon=1350, max_score=195.0,
-                render_freq=None, log=True, test_freq=None):
+                render_freq=None, log=True, test_freq=None, save_models=True):
     scores = []  
     scores_window = deque(maxlen=100)
     eps_schd = LinearSchedule(eps_start, eps_end, eps_horizon)
@@ -48,8 +48,9 @@ def train_agent(agent, env, max_t, n_episodes, alg_name, eps_start=1.0,
         print("\rEpisode %d, AVG. Score %.2f" %(i_episode, avg_score))
         if avg_score >= max_score:
             print("Solved! Episode %d" %(i_episode))
-            fname = "checkpoints/{}.pth".format(alg_name)
-            torch.save(agent.online_net.state_dict(), fname)
+            if save_models:
+                fname = "checkpoints/{}.pth".format(alg_name)
+                torch.save(agent.online_net.state_dict(), fname)
             break
     env.close()
     return scores

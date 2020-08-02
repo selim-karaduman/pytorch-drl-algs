@@ -59,7 +59,7 @@ class PriorityBuffer(UniformBuffer):
 
     def __init__(self, size, batch_size, seed, device, 
                     action_type=torch.long, alpha=0.6, eps=1e-6):
-        super().__init__(size, batch_size, seed, device)
+        super().__init__(size, batch_size, seed, device, action_type)
         self.alpha = alpha
         self.eps = eps
         segment_tree_size = int(np.power(2, np.ceil(np.log2(size))))

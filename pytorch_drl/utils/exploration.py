@@ -26,3 +26,15 @@ class OrnsteinUhlenbeck:
     def reset(self):
         self.x = self.x*0 + self.mu
 
+class Gaussian:
+
+    def __init__(self, x_size, mu=0,
+                sigma_init=0.2, sigma_final=0.2, sigma_horizon=1):
+        self.mu = mu
+        self.x_size = x_size
+        self.sigma = LinearSchedule(sigma_init, sigma_final, sigma_horizon)
+
+    def step(self):
+        x = np.random.randn(*self.x_size) * self.sigma.value + self.mu
+        self.sigma.step()
+        return x
