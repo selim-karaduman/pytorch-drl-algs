@@ -8,20 +8,20 @@ class A2CNetwork(nn.Module):
         super(A2CNetwork, self).__init__()
         self.seed = torch.manual_seed(seed)    
         self.actor = nn.Sequential(
-            nn.Linear(state_size, 128),
-            nn.Tanh(),
-            nn.Linear(128, 128),
-            nn.Tanh(),
-            nn.Linear(128, action_size),
+            nn.Linear(state_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, action_size),
             nn.Softmax(dim=-1)
         )
 
         self.critic = nn.Sequential(
-            nn.Linear(state_size, 128),
-            nn.Tanh(),
-            nn.Linear(128, 128),
-            nn.Tanh(),
-            nn.Linear(128, 1)
+            nn.Linear(state_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
         )
       
     def forward(self, state):

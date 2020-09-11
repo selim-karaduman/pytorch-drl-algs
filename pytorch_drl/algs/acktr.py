@@ -5,13 +5,15 @@ from torch import nn
 import numpy as np
 from collections import deque
 from pytorch_drl.utils.schedule import *
+from pytorch_drl.utils.kfac import KFACOptimizer
 from pytorch_drl.utils.loss import *
 from pytorch_drl.utils.parallel_env import *
 
-class A2C:
+class ACKTR:
 
     def __init__(self, 
-                 a2c_net, 
+                 actor_critic_constr, 
+                 actor_critic_args,
                  env_id,
                  gamma=0.99, 
                  lr=None, 
@@ -21,37 +23,37 @@ class A2C:
                  max_grad_norm=0.5,
                  critic_coef=0.5,
                  entropy_coef=0.01,
+                 vf_fisher_coef=1.0
                  ):
 
         self.gamma = gamma
-        self.a2c_net = a2c_net
+        self.network = actor_critic_constr(*actor_critic_args)
         self.device = device
         self.tau = tau
         self.n_env = n_env
-        self.a2c_net.to(device)
+        self.vf_fisher_coef = vf_fisher_coef
+        self.network.to(device)
         
         if lr is None:
-            self.optimizer = torch.optim.Adam(self.a2c_net.parameters())
+            self.optimizer = KFACOptimizer(self.network)
         else:
-            self.optimizer = torch.optim.Adam(self.a2c_net.parameters(), lr=lr)
+            self.optimizer = KFACOptimizer(self.network, lr=lr)
         
-        self.envs = ParallelEnv(env_id, n=n_env, seed=0)
+        self.envs = ParallelEnv(env_id, n=n_env)
         self.cur_tr_step = self.envs.reset()
         self.max_grad_norm = max_grad_norm
         self.critic_coef = critic_coef
         self.entropy_coef = entropy_coef
         
     def act(self, state, test=True):
-        # state is a numpy array
         state = torch.from_numpy(state).unsqueeze(0).float().to(self.device)
         with torch.no_grad():
-            actor_dist, critic_val = self.a2c_net(state)
+            actor_dist, critic_val = self.network(state)
         action = actor_dist.sample().item()
         return action
     
     def _sample_action(self, state):
-        # state: batch_size x [state_size]
-        actor_dist, critic_val = self.a2c_net(state)
+        actor_dist, critic_val = self.network(state)
         action = actor_dist.sample()
         return action, actor_dist.log_prob(action), critic_val, actor_dist
     
@@ -64,7 +66,7 @@ class A2C:
         actions = []
         values = []
         entropies = []
-
+        
         state = self.cur_tr_step
         for i in range(tmax):
             state = torch.from_numpy(state).float().to(device)
@@ -79,10 +81,10 @@ class A2C:
             values.append(critic_val)
             entropies.append(dist.entropy())
             state = next_state
-
+            
         self.cur_tr_step = state
         state = torch.from_numpy(state).float().to(device)
-        actor_dist, final_v = self.a2c_net(state)
+        actor_dist, final_v = self.network(state)
         
         fut_return = final_v.detach()
         returns = []
@@ -101,18 +103,29 @@ class A2C:
         actor_loss = -(log_probs * advantage.detach()).mean()
         critic_loss = (advantage).pow(2).mean()
         entropy_loss = -entropies.mean()
+
+        if self.optimizer.steps % self.optimizer.Ts == 0:
+            self.network.zero_grad()
+            pg_fisher_loss = -(log_probs).mean()
+            sample_net = (values + torch.randn_like(values)).detach()
+            vf_fisher_loss = -(sample_net - values).pow(2).mean()
+            joint_loss = (pg_fisher_loss 
+                            + self.vf_fisher_coef * vf_fisher_loss)
+
+            self.optimizer.acc_stats = True
+            joint_loss.backward(retain_graph=True)
+            self.optimizer.acc_stats = False
+
+
         loss = (self.critic_coef * critic_loss 
                 + actor_loss
-                + self.entropy_coef * entropy_loss )
+                + self.entropy_coef * entropy_loss)
         
-        self.a2c_net.zero_grad()
+        self.network.zero_grad()
         loss.backward()
-        if self.max_grad_norm is not None:
-            torch.nn.utils.clip_grad_norm_(self.a2c_net.parameters(), 
-                                            self.max_grad_norm)
         self.optimizer.step()
+  
         return loss.detach().mean().item()
-
 
     def train(self, tmax, n_traj, test_env, test_freq=1):
         losses = []
@@ -122,12 +135,9 @@ class A2C:
         next_state = None
         for i in range(n_traj):
             loss = self.learn(tmax)
-            
             losses.append(loss)
             last_losses.append(loss)
-
             avg_loss_tot = np.mean(last_losses)
-            
             # TEST:
             if i % test_freq == 0:
                 score = 0
@@ -140,14 +150,12 @@ class A2C:
                         break
                 scores.append(score)
                 last_scores.append(score)
-                avg_score = np.mean(last_scores)         
-                print("\rAVG score is {}, i: {}".format(avg_score, i).ljust(48), end="")
-
-                if avg_score >= 195.0:
+                avg_s = np.mean(last_scores)         
+                print("\rAVG score is {}, i: {}".format(avg_s, i).ljust(48), 
+                        end="")
+                if avg_s >= 195.0:
                     print("Solved! Episode %d" %(i))
-                    fname = "checkpoints/{}.pth".format("ppo_disc")
-                    torch.save(self.a2c_net.state_dict(), fname)
+                    fname = "checkpoints/{}.pth".format("acktr_disc")
+                    torch.save(self.network.state_dict(), fname)
                     break
-        
         return scores, losses
-
