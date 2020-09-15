@@ -26,7 +26,7 @@ class PPO:
                  max_grad_norm=0.5,
                  critic_coef=0.5,
                  entropy_coef=0.01,
-                 mini_batch_size=32
+                 mini_batch_size=32,
                  ):
 
         self.gamma = gamma
@@ -51,7 +51,7 @@ class PPO:
         self.critic_coef = critic_coef
         self.entropy_coef = entropy_coef
         
-    def act(self, state):
+    def act(self, state, test=True):
         # state is a numpy array
         state = torch.from_numpy(state).unsqueeze(0).float().to(self.device)
         with torch.no_grad():
@@ -59,14 +59,14 @@ class PPO:
         action = actor_dist.sample().item()
         return action
     
-    def _sample_action(self, state, no_grad=True):
+    def _sample_action(self, state):
         # state: batch_size x [state_size]
         with torch.no_grad():
             actor_dist, critic_val = self.ppo_net(state)
         action = actor_dist.sample()
         return action, actor_dist.log_prob(action), critic_val
     
-    def collect_trajectories(self, tmax):
+    def collect_trajectories(self, tmax, gail=False):
         device = self.device
         log_probs = []
         states = []
@@ -80,7 +80,6 @@ class PPO:
             state = torch.from_numpy(state).float().to(device)
             action, log_prob, critic_val = self._sample_action(state)
             next_state, reward, done, _ = self.envs.step(action.cpu().numpy())
-            
             log_probs.append(log_prob)
             states.append(state)
             actions.append(action)
@@ -97,12 +96,17 @@ class PPO:
             actor_dist, final_v = self.ppo_net(state)
         values = values + [final_v]
         
+        # For GAIL returns are not used
+        if gail:
+            return (torch.cat(log_probs), torch.cat(states), 
+                    torch.cat(actions), torch.cat(values), torch.cat(dones))
+        
         # GAE:
         fut_ret = final_v.detach()
         gae = 0
         advantages = []
         v_targs = []
-        # GAE for future rewards
+        rets = []
         for t in reversed(range(len(rewards))):
             fut_ret = rewards[t] + self.gamma * fut_ret * (1 - dones[t])
             next_val = values[t + 1] * (1 - dones[t])
@@ -112,14 +116,14 @@ class PPO:
             
             advantages.insert(0, gae)
             v_targs.insert(0, fut_ret)
-            #: gae + value[t]
+            ##: gae + value[t]
         
         advantages = torch.cat(advantages)
         if self.normalize_rewards:
             mean_rew = advantages.mean()
             std_rew = advantages.std()
-            advantages = (advantages - mean_rew)/(std_rew+1e-5)
-        
+            advantages = (advantages - mean_rew)/(std_rew+1e-8)
+    
         return (torch.cat(log_probs), torch.cat(states), 
                 torch.cat(actions), advantages, 
                 torch.cat(rewards), torch.cat(v_targs))
@@ -132,7 +136,6 @@ class PPO:
         ratio = (cur_log_probs - log_probs.detach()).exp()
         clip = torch.clamp(ratio, 1 - self.epsilon.value, 1 + self.epsilon.value)
         actor_loss = -torch.min(ratio * advantages, clip * advantages).mean()
-
         critic_loss = (cur_val - v_targs.detach()).pow(2).mean()
         entropy_loss = -cur_dist.entropy().mean()
         loss = (self.critic_coef * critic_loss 
@@ -158,7 +161,7 @@ class PPO:
         for e in range(self.epochs):
             indices = np.random.choice(np.arange(batch_size), 
                                         (num_iters, self.mini_batch_size), 
-                                        replace=True)
+                                        replace=False)
             for i in range(num_iters):
                 idx = indices[i]
                 args_sampled = (log_probs[idx], states[idx], actions[idx], 
@@ -169,8 +172,8 @@ class PPO:
     def train(self, tmax, n_traj, test_env, test_freq=1):
         losses = []
         scores = []
-        last_scores = deque(maxlen=20)
-        last_losses = deque(maxlen=20)
+        last_scores = deque(maxlen=100)
+        last_losses = deque(maxlen=100)
         for i in range(n_traj):
             args = self.collect_trajectories(tmax)
             avg_loss = self.learn(args)
@@ -179,27 +182,58 @@ class PPO:
             last_losses.append(avg_loss)
 
             avg_loss_tot = np.mean(last_losses)
-            print("\rTrajectory %d, AVG. Loss %.2f" %(i, avg_loss_tot))
-            
             if i % test_freq == 0:
-                score = 0
-                state = test_env.reset()
-                while True:
-                    action = self.act(state)
-                    state, reward, done, _ = test_env.step(action)
-                    score += reward
-                    if done:
-                        break
+                score = self.test(test_env)
                 scores.append(score)
                 last_scores.append(score)
-                avg_score = np.mean(last_scores)         
-                print("\rTEST at {}; score is {}".format(i, score))
-                print("\rAVG score is {}".format(avg_score))
-
-                if avg_score >= 195.0:
+                avg_s = np.mean(last_scores)         
+                print("\rAvg scorecore: {} i: {}".format(avg_s, i).ljust(48),
+                         end="")
+                if avg_s >= 195.0:
                     print("Solved! Episode %d" %(i))
                     fname = "checkpoints/{}.pth".format("ppo_disc")
                     torch.save(self.ppo_net.state_dict(), fname)
                     break
-        
         return scores, losses
+
+    def test(self, env, render=False, n_times=1):
+        
+        for i in range(n_times):
+            score = 0
+            state = env.reset()
+            while True:
+                action = self.act(state)
+                state, reward, done, _ = env.step(action)
+                if render:
+                    env.render()
+                score += reward
+                if done:
+                    break
+            if render:
+                print(score)
+        env.close()
+        return score
+
+    def save_trajectories(self, n_steps, fname, action_size):
+        states = []
+        actions = []
+        state = self.envs.reset()
+        for i in range(n_steps):
+            with torch.no_grad():
+                state_t = torch.from_numpy(state).float().to(self.device)
+                actor_dist, critic_val = self.ppo_net(state_t)
+            action = actor_dist.sample()
+            action_np = action.cpu().numpy()
+            next_state, reward, done, _ = self.envs.step(action_np)
+            states.append(state)
+            actions.append(np.eye(action_size)[action_np])
+            state = next_state
+            if i % 50 == 0:
+                print("\r{} / {}".format(i, n_steps).ljust(48), end="")
+
+        states = np.concatenate(states)
+        actions = np.concatenate(actions)
+        trajectory = np.concatenate([states, actions], axis=-1)
+        with open(fname, 'wb') as f:
+            np.save(f, trajectory)
+        return trajectory

@@ -30,12 +30,10 @@ def hvp(outputf, f_inputs, model, vector, damping=None):
     inputs: generator for tuple of tensors: N elements in total; net.params()
     vector: N element vector
     """
-
     outputs = outputf(model)# outputf(*f_inputs)
     jacobians = torch.autograd.grad(outputs, model.parameters(), create_graph=True)
     flat_jacobian = torch.cat([torch.flatten(p) for p in jacobians])
     g_dot_v = (vector * flat_jacobian).sum() 
-    # g(x) dot v = v.T dot g(x); for 1d
     # grad_x(g(x) dot v) = H(x)v
     Hv = torch.autograd.grad(g_dot_v, model.parameters()) 
     Hv = torch.cat([torch.flatten(p) for p in Hv]).detach()

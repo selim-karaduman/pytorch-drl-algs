@@ -154,8 +154,6 @@ class DDPG:
             else:
                 experience_batch = self.replay_buffer.sample()
             self.learn(experience_batch)
-            self.soft_update_target(self.policy_net, self.policy_net_target)
-            self.soft_update_target(self.value_net, self.value_net_target)
         
         if self.prioritized:
             self.beta.step()
@@ -193,7 +191,9 @@ class DDPG:
         self.pol_optimizer.zero_grad()
         policy_loss.backward()
         self.pol_optimizer.step()
-
+        self.soft_update_target(self.policy_net, self.policy_net_target)
+        self.soft_update_target(self.value_net, self.value_net_target)
+        
     def soft_update_target(self, source_net, target_net):
         for source_param, target_param in zip(source_net.parameters(),
                                   target_net.parameters()):

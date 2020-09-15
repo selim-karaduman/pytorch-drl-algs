@@ -8,20 +8,20 @@ class PPOPolicyNetwork(nn.Module):
         super(PPOPolicyNetwork, self).__init__()
         self.seed = torch.manual_seed(seed)    
         self.actor = nn.Sequential(
-            nn.Linear(state_size, 128),
+            nn.Linear(state_size, 64),
             nn.Tanh(),
-            nn.Linear(128, 128),
+            nn.Linear(64, 64),
             nn.Tanh(),
-            nn.Linear(128, action_size),
+            nn.Linear(64, action_size),
             nn.Softmax(dim=-1)
         )
 
         self.critic = nn.Sequential(
-            nn.Linear(state_size, 128),
+            nn.Linear(state_size, 64),
             nn.Tanh(),
-            nn.Linear(128, 128),
+            nn.Linear(64, 64),
             nn.Tanh(),
-            nn.Linear(128, 1)
+            nn.Linear(64, 1)
         )
       
     def forward(self, state):
@@ -38,9 +38,9 @@ class CriticNetwork(nn.Module):
         self.seed = torch.manual_seed(seed)    
         self.network = nn.Sequential(
             nn.Linear(state_size, H1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(H1, H2),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(H2, 1)
         )
         list(self.network)[-1].weight.data.mul_(0.1)
@@ -58,9 +58,9 @@ class ActorNetwork(nn.Module):
         self.seed = torch.manual_seed(seed)    
         self.network = nn.Sequential(
             nn.Linear(state_size, H1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(H1, H2),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(H2, action_size),
             nn.Softmax(dim=-1)
         )

@@ -40,7 +40,7 @@ class Rainbow:
                  pr_alpha = 0.2,
                  tau = 1e-3,
                  device = "cpu",
-                 eps_schedule=LinearSchedule(1.0, 0.01, 1e4)
+                 eps_schedule=None
                  ):
 
         self.gamma = gamma
@@ -66,11 +66,14 @@ class Rainbow:
         self.device = device
         self.n_replay = n_replay
         self.experience_index = 0
-        self.eps_schedule = eps_schedule
+        if eps_schedule is None:
+            self.eps_schedule = ExpSchedule(1, 0.01, 500_000)
+        else:
+            self.eps_schedule = eps_schedule
 
         if quantile_regression:
             self.tau_hat = (torch.arange(n_quants, dtype=torch.float)/n_quants 
-                            + 1/(n_quants*2))
+                            + 1/(n_quants*2)).to(device)
         
         if distributional:
             self.support = torch.linspace(vmin, vmax, atoms).to(device)
@@ -135,7 +138,6 @@ class Rainbow:
                 experience_batch = self.replay_buffer.sample()
 
             self.learn(experience_batch)
-            self.soft_update_target()
         
         if self.prioritized:
             self.beta.step()
@@ -304,6 +306,8 @@ class Rainbow:
         if self.noisy:
             self.online_net.reset_noise()
             self.target_net.reset_noise()
+
+        self.soft_update_target()
 
     def soft_update_target(self,):
         for param1, param2 in zip(self.online_net.parameters(),

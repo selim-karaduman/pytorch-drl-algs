@@ -87,7 +87,7 @@ class PriorityBuffer(UniformBuffer):
         for i in range(len(inds)):
             self._update(inds[i].item(), priorities[i].item())
         
-    def sample(self, beta):
+    def sample(self, beta=0.6):
         device = self.device
         indices = self.sum_tree.sample_batch_idx(self.batch_size)
         weights = self.sum_tree[indices]
