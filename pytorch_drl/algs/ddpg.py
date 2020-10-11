@@ -108,7 +108,7 @@ class DDPG:
         return -1 + (action - self.min_act) / (self.max_act - self.min_act) * 2 
 
     def act(self, state, test=False):
-        if len(self.replay_buffer) < self.warm_up:
+        if len(self.replay_buffer) < self.warm_up: 
             return np.random.uniform(self.min_act, self.max_act)
 
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)

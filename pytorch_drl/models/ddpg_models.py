@@ -71,3 +71,34 @@ class DDPGValueNetworkSA(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+
+class DDPGDiscrete(nn.Module):
+    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+        super(DDPGDiscrete, self).__init__()
+        #self.seed = torch.manual_seed(seed)
+        self.fc1 = nn.Linear(state_size, H1)
+        self.fc2 = nn.Linear(H1, H2)
+        self.fc3 = nn.Linear(H2, action_size)
+
+    def forward(self, x, batch=True):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+
+class MADDPGValueNetwork(nn.Module):
+    
+    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+        super(MADDPGValueNetwork, self).__init__()
+        #self.seed = torch.manual_seed(seed)
+        self.fc1 = nn.Linear(state_size + action_size, H1)
+        self.fc2 = nn.Linear(H1, H2)
+        self.fc3 = nn.Linear(H2, 1)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x

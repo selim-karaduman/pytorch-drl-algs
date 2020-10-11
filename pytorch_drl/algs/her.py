@@ -15,7 +15,6 @@ class HER:
         self.concat = lambda s, g: np.concatenate([s, g], axis=-1)
         if not hasattr(self.agent, 'step'):
             print("""Only Off-policy algorithms can be used. 
-                The algorithm should have step(...) function implemented.
                 Algorithms to use: DQN(Rainbow file), DDPG, TD3, SAC.""")
             raise ValueError
         

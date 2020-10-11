@@ -73,3 +73,4 @@ def test_agent(agent, env, max_t, render=True, num_of_episodes=1, log=True):
             print(score)
     env.close()
     return score_avg/num_of_episodes
+

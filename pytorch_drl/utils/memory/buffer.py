@@ -20,7 +20,7 @@ class UniformBuffer:
                                         'done'])
         self.buffer = deque(maxlen=size)
         self.action_type = action_type
-        
+                
     def add(self, state, action, reward, next_state, done):
         experience = self.Experience(state, action, reward, next_state, done)
         self.buffer.append(experience)
@@ -180,3 +180,39 @@ class EpisodicBuffer:
     def __len__(self):
         return len(self.buffer)
 
+#-----------------------------------------------------------------------------
+
+class MABuffer(UniformBuffer):
+    def __init__(self, size, batch_size, 
+                    seed, device, action_type=torch.float):
+        super().__init__(size, batch_size, seed, device, action_type)
+    
+    def sample(self):
+        device = self.device
+        idx = np.random.choice(len(self.buffer), self.batch_size, replace=False)
+        states = []
+        actions = []
+        rewards = []
+        next_states = []
+        dones = []
+
+        for i in idx:
+            exp = self.buffer[i]
+            states.append(exp.state)
+            actions.append(exp.action)
+            rewards.append(exp.reward)
+            next_states.append(exp.next_state)
+            dones.append(exp.done)
+
+        states = [torch.from_numpy(np.vstack(ag)).float().to(device)
+                    for ag in list(zip(*states))]
+        actions = [torch.from_numpy(np.vstack(ag)).type(self.action_type).to(device)
+                    for ag in list(zip(*actions))]
+        rewards = [torch.from_numpy(np.vstack(ag)).float().to(device)
+                    for ag in list(zip(*rewards))]
+        next_states = [torch.from_numpy(np.vstack(ag)).float().to(device)
+                        for ag in list(zip(*next_states))]
+        dones = [torch.from_numpy(np.vstack(ag).astype(np.uint8)).to(device)
+                    for ag in list(zip(*dones))]
+
+        return states, actions, rewards, next_states, dones
