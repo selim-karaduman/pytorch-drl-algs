@@ -2,20 +2,21 @@ import time
 from torch.distributions import Categorical
 import torch
 from torch import nn
+import copy
+import gym
 import numpy as np
 from collections import deque
-from pytorch_drl.utils.schedule import *
-from pytorch_drl.utils.loss import *
-from pytorch_drl.utils.parallel_env import *
-from pytorch_drl.utils.model_utils import *
-from pytorch_drl.utils.memory.buffer import *
+import pytorch_drl.utils.model_utils as model_utils
+from pytorch_drl.algs.base import Agent
+from pytorch_drl.utils.memory.buffer import EpisodicBuffer
 from pytorch_drl.utils.shared_optim import AdamShared
 import torch.multiprocessing as mp
+
 
 class ACER_Agent(mp.Process):
 
     def __init__(self, 
-                 shared_model=None,
+                 network=None,
                  average_model=None,
                  queue=None,
                  net_constr=None,
@@ -65,18 +66,18 @@ class ACER_Agent(mp.Process):
         self.queue = queue
         self.n_env = n_env
         self.mp_id = mp_id
-        self.shared_model = shared_model
+        self.shared_model = network
         self.average_model = average_model
         self.max_episode_length = max_episode_length
         self.start_off_policy = start_off_policy
 
         self.n_eps = 1e-10 # epsilon for log, div
-        self.model = net_constr(*net_args)
-        self.model.load_state_dict(self.shared_model.state_dict())
+        self.model = copy.deepcopy(self.shared_model)
         self.optimizer = optimizer
 
         memory_size = memory_size_steps // max_traj_length // n_env
-        self.buffer = EpisodicBuffer(memory_size, seed, self.device, batch_size)
+        self.buffer = EpisodicBuffer(memory_size, seed,
+                                        self.device, batch_size)
         
         self.env = env_constr(*env_args)
         self.state = self.env.reset()
@@ -90,7 +91,8 @@ class ACER_Agent(mp.Process):
         states, actions, rewards, policies, dones = [], [], [], [], []
         for i in range(self.max_traj_length-1):
             self.episode_t += 1
-            state_th = torch.from_numpy(self.state).float().unsqueeze(0).to(self.device)
+            state_th = torch.from_numpy(self.state)\
+                        .float().unsqueeze(0).to(self.device)
             policy, q_value = self.model(state_th)
             action = Categorical(policy).sample().item()
             next_state, reward, done, _ = self.env.step(action)
@@ -125,7 +127,7 @@ class ACER_Agent(mp.Process):
         states, actions, rewards, b_policies, dones = batch
         policies, q_values, avg_policies = [], [], []
 
-        # ====================== COLLECT DATA ================================
+        # =================== COLLECT DATA =============================
         k = states.shape[0]
         for i in range(k):
             state = states[i]
@@ -140,13 +142,15 @@ class ACER_Agent(mp.Process):
         q_values = torch.stack(q_values)
         avg_policies = torch.stack(avg_policies)
 
-        # ========================= LEARN ====================================
+        # ========================= LEARN ==============================
         
-        value = (policies[k-1] * q_values[k-1]).sum(-1, keepdims=True).detach()
+        value = (policies[k-1] * q_values[k-1])\
+                    .sum(-1, keepdims=True).detach()
         q_ret = value
         loss = 0
         for t in reversed(range(k-1)):
-            value = (policies[t] * q_values[t]).sum(-1, keepdims=True).detach()
+            value = (policies[t] 
+                        * q_values[t]).sum(-1, keepdims=True).detach()
             q_ret = rewards[t] + self.gamma * q_ret * (1-dones[t])
             ratio = (policies[t] / (b_policies[t]+eps)).detach()
             correction_constant = ((1 - self.clip/(ratio+eps)).clamp(min=0) 
@@ -164,7 +168,7 @@ class ACER_Agent(mp.Process):
 
             critic_loss = ((delta).pow(2) / 2).mean()
 
-            # =========================== TRPO ===============================
+            # ========================= TRPO ===========================
             if self.use_trpo:
                 k_grad = (avg_policies[t] / (policies[t]+eps)).detach()
                 gradient = -torch.autograd.grad(inputs=policies, 
@@ -182,7 +186,7 @@ class ACER_Agent(mp.Process):
                 policy_trpo_loss = (grad_offset_norm * kl_div)
                 policy_loss += policy_trpo_loss
 
-            # ================================================================
+            # ==========================================================
             entropy_loss = -(Categorical(policies[t]).entropy() 
                                 * self.entropy_coefficient).mean()
 
@@ -199,12 +203,11 @@ class ACER_Agent(mp.Process):
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 
                                             self.max_grad_norm)
         
-        transfer_gradients(self.model, self.shared_model)
+        model_utils.transfer_gradients(self.model, self.shared_model)
         self.optimizer.step()
-        soft_update_model(self.shared_model, 
-                self.average_model, 1 - self.polyak_alpha)
+        model_utils.soft_update_model(self.shared_model, self.average_model, 
+                                        1 - self.polyak_alpha)
         
-
     # runs in parallel
     def run(self):
         for i in range(self.max_episodes):
@@ -224,22 +227,15 @@ class ACER:
 
     def __init__(self, *args, **kwargs):
         
-        if "net_constr" not in kwargs:
-            print("A model constructor that suits ACER implementation is needed")
-            raise ValueError
-
         if "env_constr" not in kwargs or "env_name" not in kwargs:
             print("Environment is required")
             raise ValueError
         
-        net_constr = kwargs["net_constr"]
-        net_args = kwargs["net_args"]
-        self.shared_model = net_constr(*net_args)
+        network = kwargs["network"]
+        self.shared_model = network
+        self.average_model = copy.deepcopy(self.shared_model)
         self.shared_model.share_memory()
-        
-        self.average_model = net_constr(*net_args)
         self.average_model.share_memory()
-        self.average_model.load_state_dict(self.shared_model.state_dict())
         self.queue = mp.Queue()
         lr = kwargs["lr"] if "lr" in kwargs else 1e-3
         self.optimizer = AdamShared(self.shared_model.parameters(), lr=lr)
@@ -247,7 +243,6 @@ class ACER:
         self.n_env = kwargs["n_env"]
         self.args = args
         self.kwargs = kwargs
-        self.kwargs["shared_model"] = self.shared_model
         self.kwargs["average_model"] = self.average_model
         self.kwargs["queue"] = self.queue
         self.kwargs["optimizer"] = self.optimizer
@@ -314,3 +309,14 @@ class ACER:
                     break
             print(score)
         env.close()
+
+
+    def save(self, fname):
+        torch.save({"actor_critic_sd": self.shared_model.state_dict()}, fname)
+
+    def load(self, fname):
+        dat = torch.load(fname)
+        self.shared_model.load_state_dict(dat["actor_critic_sd"])
+
+
+

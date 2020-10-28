@@ -166,7 +166,8 @@ class EpisodicBuffer:
                     zip(*batch)))
             )
         """
-        states: n_steps x batch_size x [state_size]
+        states: (n_steps+1) x batch_size x [*state_size]
+        actions: n_steps x batch_size x [*action_size]
         """
         
         states = torch.from_numpy(states).float().to(device)

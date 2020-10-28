@@ -5,6 +5,9 @@ def soft_update_model(source_net, target_net, tau):
                                 target_net.parameters()):
         t_param.data.copy_((1 - tau) * t_param + tau * s_param)
 
+def hard_update_model(source_net, target_net):
+    target_net.load_state_dict(source_net.state_dict())
+
 
 def transfer_gradients(source_net, target_net):
     for s_param, t_param in zip(source_net.parameters(),

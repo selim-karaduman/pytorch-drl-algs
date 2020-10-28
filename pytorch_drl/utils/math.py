@@ -3,7 +3,7 @@ import torch
 def conjugate_gradient(Af, b, max_steps=10, eps=1e-8):
     """
      Af: Method like dot product wrt matrix A
-     b: shape: (N,)
+     b: tensor of shape: (N,)
      Return x for Ax =~ b (for symmetric +definite A)
     """
     x = torch.zeros_like(b).to(b)
@@ -24,14 +24,15 @@ def conjugate_gradient(Af, b, max_steps=10, eps=1e-8):
 
     return x
 
-def hvp(outputf, f_inputs, model, vector, damping=None):
+def hvp(outputf, model, vector, damping=None):
     """
     outputf: function that will generate 1 element tensor
-    inputs: generator for tuple of tensors: N elements in total; net.params()
+    model: model wrt which the gradient is calculated
     vector: N element vector
     """
-    outputs = outputf(model)# outputf(*f_inputs)
-    jacobians = torch.autograd.grad(outputs, model.parameters(), create_graph=True)
+    outputs = outputf()
+    jacobians = torch.autograd.grad(outputs, model.parameters(), 
+                                        create_graph=True)
     flat_jacobian = torch.cat([torch.flatten(p) for p in jacobians])
     g_dot_v = (vector * flat_jacobian).sum() 
     # grad_x(g(x) dot v) = H(x)v

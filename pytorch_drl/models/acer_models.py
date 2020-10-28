@@ -4,9 +4,8 @@ import torch.nn.functional as F
 
 class ACERModel(nn.Module):
 
-    def __init__(self, state_size, action_size, seed=0):
+    def __init__(self, state_size, action_size):
         super(ACERModel, self).__init__()
-        self.seed = torch.manual_seed(seed)    
         
         self.actor = nn.Sequential(
             nn.Linear(state_size, 128),

@@ -14,10 +14,8 @@ def init_uniform(layer, l=-3e-3, r=3e-3):
           
 class DDPGValueNetwork(nn.Module):
     
-    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+    def __init__(self, state_size, action_size, H1=64, H2=64):
         super(DDPGValueNetwork, self).__init__()
-        self.seed = torch.manual_seed(seed)
-
         self.fc1 = nn.Linear(state_size, H1)
         self.fc2 = nn.Linear(H1+action_size, H2)
         self.fc3 = nn.Linear(H2, 1)
@@ -33,10 +31,9 @@ class DDPGValueNetwork(nn.Module):
         return x
 
 class DDPGPolicyNetwork(nn.Module):
-    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+    def __init__(self, state_size, action_size, H1=64, H2=64):
         super(DDPGPolicyNetwork, self).__init__()
-        self.seed = torch.manual_seed(seed)
-
+        
         self.fc1 = nn.Linear(state_size, H1)
         self.fc2 = nn.Linear(H1, H2)
         self.fc3 = nn.Linear(H2, action_size)
@@ -54,9 +51,8 @@ class DDPGPolicyNetwork(nn.Module):
 
 class DDPGValueNetworkSA(nn.Module):
     
-    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+    def __init__(self, state_size, action_size, H1=64, H2=64):
         super(DDPGValueNetworkSA, self).__init__()
-        self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size + action_size, H1)
         self.fc2 = nn.Linear(H1, H2)
         self.fc3 = nn.Linear(H2, 1)
@@ -74,9 +70,8 @@ class DDPGValueNetworkSA(nn.Module):
 
 
 class DDPGDiscrete(nn.Module):
-    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+    def __init__(self, state_size, action_size, H1=64, H2=64):
         super(DDPGDiscrete, self).__init__()
-        #self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size, H1)
         self.fc2 = nn.Linear(H1, H2)
         self.fc3 = nn.Linear(H2, action_size)
@@ -90,9 +85,8 @@ class DDPGDiscrete(nn.Module):
 
 class MADDPGValueNetwork(nn.Module):
     
-    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+    def __init__(self, state_size, action_size, H1=64, H2=640):
         super(MADDPGValueNetwork, self).__init__()
-        #self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size + action_size, H1)
         self.fc2 = nn.Linear(H1, H2)
         self.fc3 = nn.Linear(H2, 1)

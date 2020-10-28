@@ -10,8 +10,10 @@ from pytorch_drl.utils.loss import *
 from pytorch_drl.utils.parallel_env import *
 from pytorch_drl.utils.exploration import *
 from pytorch_drl.utils.memory.buffer import PriorityBuffer, UniformBuffer
+import pytorch_drl.utils.misc as misc
+import pytorch_drl.utils.model_utils as model_utils
 
-class SAC:
+class SAC(Agent):
 
     def __init__(self, 
                 policy_net_constructor=None,
@@ -33,8 +35,13 @@ class SAC:
                 noise_process=None,
                 warm_up=1e2,
                 learn_interval=2,
-                seed=0
+                seed=0,
+                action_space="discrete"
                 ):
+        
+        if action_space not in {"continuous"}:
+            print('action_space should be in {"continuous"}')
+            raise ValueError
 
         if (policy_net_constructor is None) or (value_net_constructor is None):
             print("Model constructors are required")
@@ -61,6 +68,7 @@ class SAC:
         self.warm_up = warm_up
         self.learn_interval = learn_interval
         self.entropy_alpha = entropy_alpha
+        self.action_space = action_space
         action_type = torch.float
         self.experience_index = 0
 
@@ -85,13 +93,6 @@ class SAC:
                                             seed, device,
                                             action_type=action_type)
 
-    def nn_to_action(self, action):
-        # action: each element is between [-1, 1]
-        return self.min_act + (self.max_act - self.min_act) * (action + 1) / 2
-
-    def action_to_nn(self, action):
-        return -1 + (action - self.min_act) / (self.max_act - self.min_act) * 2 
-
     def act(self, state, test=False):
         if len(self.replay_buffer) < self.warm_up:
             return np.random.uniform(self.min_act, self.max_act)
@@ -101,14 +102,15 @@ class SAC:
         with torch.no_grad():
             action, _ = self.policy_net(state, add_noise)
         action = action.squeeze(0).detach().cpu().numpy()
-        return self.nn_to_action(action)
+        action = misc.tanh_expand(self.min_act, self.max_act, action)
+        return action
 
     def append_to_buffer(self, state, action, reward, next_state, done):
         self.replay_buffer.add(state, action, reward, next_state, done)
         
     def step(self, state, action, reward, next_state, done):
         self.experience_index += 1
-        action = self.action_to_nn(action)
+        action = misc.squish_tanh(self.min_act, self.max_act, action)
         self.append_to_buffer(state, action, reward, next_state, done)
         if (len(self.replay_buffer) > self.batch_size and
             self.experience_index > self.warm_up and
@@ -156,11 +158,7 @@ class SAC:
         policy_loss.backward()
         self.pol_optimizer.step()
 
-        self.soft_update_target(self.value_net1, self.value_net_target1)
-        self.soft_update_target(self.value_net2, self.value_net_target2)
-
-    def soft_update_target(self, source_net, target_net):
-        for source_param, target_param in zip(source_net.parameters(),
-                                  target_net.parameters()):
-            target_param.data.copy_((1-self.tau)*target_param 
-                                    + self.tau*source_param)
+        model_utils.soft_update_model(self.value_net1, 
+            self.value_net_target1, self.tau)
+        model_utils.soft_update_model(self.value_net2, 
+            self.value_net_target2, self.tau)

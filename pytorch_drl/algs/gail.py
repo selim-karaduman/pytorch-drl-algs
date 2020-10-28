@@ -10,10 +10,8 @@ PPO GAIL
 class GAIL:
 
     def __init__(self,
-                 ppo_net_constr,
-                 ppo_net_args,
-                 discriminator_constr,
-                 discriminator_args,
+                 actor_critic,
+                 discriminator,
                  expert_trajectories,
                  env_id,
                  action_size,
@@ -33,9 +31,9 @@ class GAIL:
                  buf_len=10e4
                  ):
     
-        self.ppo_net = ppo_net_constr(*ppo_net_args)
-        self.ppo_net.to(device)
-        self.discriminator = discriminator_constr(*discriminator_args)
+        self.actor_critic = actor_critic
+        self.actor_critic.to(device)
+        self.discriminator = discriminator
         self.discriminator.to(device)
         self.device = device
         self.action_size = action_size
@@ -53,7 +51,7 @@ class GAIL:
             self.optimizer = torch.optim.Adam(self.discriminator.parameters(),
                                                  lr=lr_discriminator)
 
-        self.ppo_agent = PPO(self.ppo_net, 
+        self.ppo_agent = PPO(self.actor_critic, 
                              env_id,
                              gamma=gamma, 
                              epochs=ppo_epochs, 
@@ -65,7 +63,8 @@ class GAIL:
                              critic_coef=critic_coef,
                              entropy_coef=entropy_coef,
                              mini_batch_size=mini_batch_size,
-                             normalize_rewards=normalize_rewards)
+                             normalize_rewards=normalize_rewards,
+                             gail=True)
         
     def act(self, state):
         return self.ppo_agent.act(state)
@@ -77,7 +76,7 @@ class GAIL:
         batch = torch.from_numpy(batch).float().to(self.device)
         return batch
 
-    def train(self, tmax, n_traj, test_env, test_freq=1):
+    def train(self, tmax, n_traj, test_env, max_score, alg_name, test_freq=1):
         batch_size = tmax * self.n_env
         d_loss = F.binary_cross_entropy
         losses = []
@@ -85,9 +84,10 @@ class GAIL:
         last_scores = deque(maxlen=100)
         last_losses = deque(maxlen=100)
         for e in range(n_traj):
-            log_probs, states, actions, values, dones = \
-                self.ppo_agent.collect_trajectories(tmax, gail=True)
-
+            args = self.ppo_agent.collect_trajectories(tmax)
+            # only ppo
+            log_probs, states, actions, values, dones = args
+            
             real_pairs = self.sample_real_pairs(batch_size)
             actions_one_hot = torch.eye(self.action_size)[actions]\
                                 .float().to(self.device)
@@ -107,7 +107,12 @@ class GAIL:
 
             # change returns with discriminator estimation
             fake_logits = self.discriminator(fake_pairs).detach()
-            rewards = torch.log(fake_logits) - torch.log1p(-fake_logits)
+            rewards = torch.log(fake_logits)
+
+            if self.normalize_rewards:
+                mean_rew = rewards.mean()
+                std_rew = rewards.std()
+                rewards = (rewards - mean_rew)/(std_rew+1e-8)
             # GAE:
             fut_ret = values[-1]
             gae = 0
@@ -122,12 +127,6 @@ class GAIL:
                 v_targs.insert(0, gae + values[t])
             advantages = torch.cat(advantages)
             v_targs = torch.cat(v_targs)
-
-            if self.normalize_rewards:
-                mean_rew = advantages.mean()
-                std_rew = advantages.std()
-                advantages = (advantages - mean_rew)/(std_rew+1e-5)
-            args = (log_probs, states, actions, advantages, rewards, v_targs)
             self.ppo_agent.learn(args)
             
             # ============================= TEST =============================
@@ -135,16 +134,22 @@ class GAIL:
                 score = self.ppo_agent.test(test_env)
                 scores.append(score)
                 last_scores.append(score)
-                avg_s = np.mean(last_scores)         
-                print("\rAVG score is {}, i: {}".format(avg_s, e).ljust(48), 
+                avg = np.mean(last_scores)         
+                print("\rAvg score is {:.2f}, i: {}".format(avg, e).ljust(48), 
                         end="")
-                if avg_s >= 195.0:
+                if avg >= max_score:
                     print("Solved! Episode %d" %(i))
-                    fname = "checkpoints/{}.pth".format("ppo_disc")
-                    torch.save(self.ppo_net.state_dict(), fname)
+                    fname = "checkpoints/{}.pth".format(alg_name)
+                    self.save(fname)
                     break
         
         return scores, losses
 
     def test(self, env, render=False, n_times=1):
         self.ppo_agent.test(env, render=render, n_times=n_times)
+
+    def save(self, fname):
+        self.ppo_agent.save(fname)
+
+    def load(self, fname):
+        self.ppo_agent.load(fname)

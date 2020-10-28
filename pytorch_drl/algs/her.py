@@ -9,13 +9,13 @@ from collections import deque
 
 class HER:
 
-    def __init__(self, env, alg_constr, alg_args, alg_kwargs):
-        self.agent = alg_constr(*alg_args, **alg_kwargs)
+    def __init__(self, env, agent):
+        self.agent = agent
         self.env = env
         self.concat = lambda s, g: np.concatenate([s, g], axis=-1)
         if not hasattr(self.agent, 'step'):
             print("""Only Off-policy algorithms can be used. 
-                Algorithms to use: DQN(Rainbow file), DDPG, TD3, SAC.""")
+                Algorithms to use: DQN(rainbow.py), DDPG, TD3, SAC.""")
             raise ValueError
         
     def train(self, n_traj, t_max, n_epochs, max_score, render_freq=None, 
@@ -58,21 +58,6 @@ class HER:
                 break
         self.env.close()
         return scores
-
-    def final_state_strategy(self, episode, state, n):
-        # Take final state as the goal
-        if not hasattr(self, 'cache'):
-            self.cache = [list(zip(*episode))[0][-1]]
-        return self.cache
-
-    def random_bias_strategy(self, episode, state, n):
-        return random.choices(list(zip(*episode))[0], k=n) + [state]
-
-    def random_strategy(self, episode, state, n):
-        return random.choices(list(zip(*episode))[0], k=n)
-
-    def next_strategy(self, episode, state, n):
-        return [state]        
 
     def train_episode(self, t_max, n_epochs, n_strategy, strategy, 
                         render=False):
@@ -131,3 +116,19 @@ class HER:
             #print(score)
         self.env.close()
         return score_avg/num_of_episodes
+
+    # DIFFERENT STRATEGIES:
+    def final_state_strategy(self, episode, state, n):
+        # Take final state as the goal
+        if not hasattr(self, 'cache'):
+            self.cache = [list(zip(*episode))[0][-1]]
+        return self.cache
+
+    def random_bias_strategy(self, episode, state, n):
+        return random.choices(list(zip(*episode))[0], k=n) + [state]
+
+    def random_strategy(self, episode, state, n):
+        return random.choices(list(zip(*episode))[0], k=n)
+
+    def next_strategy(self, episode, state, n):
+        return [state]        

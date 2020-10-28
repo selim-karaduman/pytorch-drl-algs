@@ -6,9 +6,8 @@ from torch.distributions import Normal
 
 class SACPolicyNetwork(nn.Module):
     def __init__(self, state_size, action_size, H1=64, H2=64, 
-                min_log_std=-20, max_log_std=2, seed=0):
+                min_log_std=-20, max_log_std=2):
         super(SACPolicyNetwork, self).__init__()
-        self.seed = torch.manual_seed(seed)
         self.eps = 1e-8
         self.min_log_std = min_log_std
         self.max_log_std = max_log_std
@@ -37,9 +36,8 @@ class SACPolicyNetwork(nn.Module):
 
 class SACValueNetwork(nn.Module):
     
-    def __init__(self, state_size, action_size, H1=64, H2=64, seed=0):
+    def __init__(self, state_size, action_size, H1=64, H2=64):
         super(SACValueNetwork, self).__init__()
-        self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size + action_size, H1)
         self.fc2 = nn.Linear(H1, H2)
         self.fc3 = nn.Linear(H2, 1)
