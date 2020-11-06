@@ -27,7 +27,6 @@ class PPO(ActorCritic):
                  critic_coef=0.5,
                  entropy_coef=0.01,
                  mini_batch_size=32,
-                 warm_up=0,
                  gail=False,
                  use_gae=True,
                  ):
@@ -39,7 +38,6 @@ class PPO(ActorCritic):
         self.epsilon = LinearSchedule(epsilon_init, 
                                         epsilon_final, epsilon_horizon)
         self.gamma = gamma
-        self.warm_up = warm_up
         self.epochs = epochs
         self.actor_critic = actor_critic
         self.device = device
@@ -59,11 +57,7 @@ class PPO(ActorCritic):
         
 
     def act(self, state, deterministic=False):
-        if self.exp_index < self.warm_up: 
-            self.exp_index += 1
-            return self.action_space.sample()
         state = torch.from_numpy(state).unsqueeze(0).float().to(self.device)
-
         with torch.no_grad():
             actor_dist, val = self.actor_critic(state)
         

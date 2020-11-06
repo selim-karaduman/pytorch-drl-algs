@@ -1,94 +1,88 @@
 import math
 import random
 import time
+import copy
 import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import namedtuple, deque
-from pytorch_drl.models.rainbow_models import *
 from pytorch_drl.utils.memory.buffer import PriorityBuffer, UniformBuffer
-from pytorch_drl.utils.schedule import *
-from pytorch_drl.utils.loss import *
+from pytorch_drl.utils.schedule import ExpSchedule, LinearSchedule
+import pytorch_drl.utils.loss as loss_functions
+import pytorch_drl.utils.model_utils as model_utils
+from pytorch_drl.algs.base import ValueBased
 
-class Rainbow:
+class Rainbow(ValueBased):
    
     def __init__(self,
-                 state_size,
                  action_size,
-                 seed,
-                 vmin=0,
-                 vmax=0,
-                 atoms=0,
-                 distributional=False,
-                 n_quants=0,
-                 quantile_regression=False,
-                 prioritized_replay=False,
-                 ddqn=False,
-                 n=1, #n-step
-                 nstep=False,
-                 noisy=False,
-                 model1=None,
-                 model2=None,
-                 gamma = 0.99,
-                 lr = None,
-                 n_replay = 4,
-                 buf_size = int(1e5),
-                 batch_size = 64,
-                 is_beta = 0.6, #importance sampling (per)
-                 beta_horz = 10e5,
-                 pr_alpha = 0.2,
-                 tau = 1e-3,
-                 device = "cpu",
-                 eps_schedule=None
-                 ):
+                 model=None,
+                 gamma=0.99,
+                 lr=1e-3,
+                 learn_every=4,
+                 buf_size=int(1e5),
+                 batch_size=64,
+                 tau=1e-3,
+                 device="cpu",
+                 seed=0,
+                 eps_start=1, 
+                 eps_final=0.01, 
+                 eps_n=1e5, #number of steps till for epsilon decay
+                 ddqn=False, #double q learning
 
+                 categorical_dqn=False, #use c51 algortihm
+                 vmin=0, #categorical_dqn: vmin
+                 vmax=0, #categorical_dqn: vmax
+                 atoms=51,#categorical_dqn: atoms
+                 
+                 quantile_regression=False, # use quantile regression
+                 n_quants=51, #quantile_regression: number of quants
+                 
+                 prioritized_replay=False, # use per
+                 is_beta=0.6, # per: importance sampling
+                 beta_horz=1e5, #per: beta
+                 pr_alpha=0.2, # per: alpha
+                 
+                 nstep=False, #use nstep returns
+                 n=1, #n-step: n
+                 
+                 noisy=False, #use nosiy linear layers
+                 ):
+        super().__init__()
         self.gamma = gamma
         self.tau = tau
         self.batch_size = batch_size
         self.prioritized = prioritized_replay
         self.ddqn = ddqn
-        self.distributional = distributional
+        self.categorical_dqn = categorical_dqn
         self.n_quants = n_quants
         self.quantile_regression = quantile_regression
         self.n = n
         self.nstep = nstep
         self.noisy = noisy
-        self.state_size = state_size
         self.action_size = action_size
         self.seed = random.seed(seed)
         self.vmin = vmin
         self.vmax = vmax
         self.atoms = atoms
         self.nstep_buffer = deque(maxlen=n)
-        self.online_net = model1
-        self.target_net = model2
+        self.online_net = model
+        self.target_net = copy.deepcopy(model)
         self.device = device
-        self.n_replay = n_replay
-        self.experience_index = 0
-        if eps_schedule is None:
-            self.eps_schedule = ExpSchedule(1, 0.01, 500_000)
-        else:
-            self.eps_schedule = eps_schedule
+        self.learn_every = learn_every
+        self.online_net.to(device)
+        self.target_net.to(device)
+        self.optimizer = torch.optim.Adam(self.online_net.parameters(), lr=lr)
+        self.eps_schedule = ExpSchedule(eps_start, eps_final, eps_n)
 
         if quantile_regression:
             self.tau_hat = (torch.arange(n_quants, dtype=torch.float)/n_quants 
-                            + 1/(n_quants*2)).to(device)
+                            + 1 / (n_quants * 2)).to(device)
         
-        if distributional:
+        if categorical_dqn:
             self.support = torch.linspace(vmin, vmax, atoms).to(device)
             self.delta_z = (vmax - vmin) / (atoms - 1) 
-
-        if model1 == None or model2 == None:
-            raise ValueError
-        
-        if lr is None:
-            self.optimizer = torch.optim.Adam(self.online_net.parameters())
-        else:
-            self.optimizer = torch.optim.Adam(self.online_net.parameters(), lr=lr)
-
-        self.online_net.to(device)
-        self.target_net.to(device)
         
         if self.nstep:
             self.discount = self.gamma ** n
@@ -106,30 +100,28 @@ class Rainbow:
         
     def append_to_buffer(self, state, action, reward, next_state, done):
         if self.nstep:
-            self.nstep_buffer.append((state, action, reward, next_state, done))
-
+            self.nstep_buffer.append((state, action, reward,
+                                        next_state, done))
             if len(self.nstep_buffer) < self.n:
                 return
-
-            last_state = state
+            # calculate n-step return:
+            last_state = next_state
             first_state, first_action = self.nstep_buffer[0][:2]
             discounted_reward = 0
             for s, a, r, s_, d in reversed(self.nstep_buffer):
                 discounted_reward = self.gamma * discounted_reward * (1-d) + r
-                if d: 
+                if d:  
                     last_state = s_
                     done = True
-
             self.replay_buffer.add(first_state, first_action, 
                                     discounted_reward, last_state, done)
-        
         else:
             self.replay_buffer.add(state, action, reward, next_state, done)
 
     def step(self, state, action, reward, next_state, done):
         self.append_to_buffer(state, action, reward, next_state, done)
-        self.experience_index = (self.experience_index + 1) % self.n_replay
-        if self.experience_index == 0\
+        self.exp_index = (self.exp_index + 1) % self.learn_every
+        if self.exp_index == 0\
             and len(self.replay_buffer) > self.batch_size:
 
             if self.prioritized:
@@ -144,12 +136,12 @@ class Rainbow:
                 
     def get_best_action(self, state):
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
-        if self.distributional:
+        if self.categorical_dqn:
             expected_vals = (self.online_net(state) * self.support).sum(2)
             action = expected_vals.argmax(1).item()
         elif self.quantile_regression:
-            action = ((self.online_net(state).detach().mean(2))
-                            .argmax(1).item())
+            expected_vals = (self.online_net(state).detach().mean(2))
+            action = expected_vals.argmax(1).item()
         else:
             action = self.online_net(state).argmax(1).item()
         return action
@@ -165,9 +157,23 @@ class Rainbow:
                 action = self.get_best_action(state)
             if test:
                 self.online_net.train()
-
         self.eps_schedule.step()
         return action
+
+    def learn(self, experiences): 
+        if self.quantile_regression:
+            self.learn_qr(experiences)
+        elif self.categorical_dqn:
+            self.learn_categorical_dqn(experiences)
+        else:
+            self.learn_expected(experiences)
+
+        if self.noisy:
+            self.online_net.reset_noise()
+            self.target_net.reset_noise()
+
+        model_utils.soft_update_model(self.online_net, 
+                                        self.target_net, self.tau)
 
     def learn_expected(self, experiences):
         if self.prioritized:
@@ -199,7 +205,7 @@ class Rainbow:
         loss.backward()
         self.optimizer.step()
 
-    def learn_distributional(self, experiences):
+    def learn_categorical_dqn(self, experiences):
         if self.prioritized:
             states, actions, rewards,\
                 next_states, dones, indices, weights = experiences
@@ -282,7 +288,8 @@ class Rainbow:
         qnt_tg = rewards + (self.discount * qnt_next * (1-dones))
 
         diff = qnt_tg.unsqueeze(1) - qnt_sa.unsqueeze(2) #Get for all points
-        loss = quantile_huber_loss(diff, self.tau_hat.view(1, -1, 1), k=1)
+        loss = loss_functions.quantile_huber_loss(diff, 
+                    self.tau_hat.view(1, -1, 1), k=1)
         
         loss = loss.mean(1).sum(-1)
         if self.prioritized:
@@ -295,22 +302,9 @@ class Rainbow:
         loss.backward()
         self.optimizer.step()
 
-    def learn(self, experiences): 
-        if self.quantile_regression:
-            self.learn_qr(experiences)
-        elif self.distributional:
-            self.learn_distributional(experiences)
-        else:
-            self.learn_expected(experiences)
+    def save(self, fname):
+        torch.save({"network": self.online_net.state_dict()}, fname)
 
-        if self.noisy:
-            self.online_net.reset_noise()
-            self.target_net.reset_noise()
-
-        self.soft_update_target()
-
-    def soft_update_target(self,):
-        for param1, param2 in zip(self.online_net.parameters(),
-                                  self.target_net.parameters()):
-            param2.data.copy_((1-self.tau)*param2 + self.tau*param1)
-
+    def load(self, fname):
+        dat = torch.load(fname)
+        self.online_net.load_state_dict(dat["network"])

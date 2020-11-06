@@ -6,34 +6,31 @@ import numpy as np
 import random
 import copy
 from collections import deque
-from pytorch_drl.utils.schedule import *
-from pytorch_drl.utils.loss import *
-from pytorch_drl.utils.parallel_env import *
-from pytorch_drl.utils.exploration import *
 from pytorch_drl.utils.memory.buffer import PriorityBuffer, UniformBuffer
-import pytorch_drl.utils.misc
-import pytorch_drl.utils.model_utils
+import pytorch_drl.utils.misc as misc
+import pytorch_drl.utils.model_utils as model_utils
+from pytorch_drl.algs.base import ValueBased
 
-class DDPG:
+class DDPG(ValueBased):
 
     def __init__(self, 
-                policy_net=None,
-                value_net=None,
-                gamma=0.99, 
-                lr_val=1e-3,
-                lr_pol=1e-3,
-                buf_size=int(1e5),
-                batch_size=64,
-                tau=1e-3,
-                device="cpu",
-                normalize_rewards=False,
-                max_grad_norm=0.5,
-                noise_process=None,
-                warm_up=1e2,
-                seed=0,
-                env_id=None
-                ):
-
+                 policy_net=None,
+                 value_net=None,
+                 gamma=0.99, 
+                 lr_val=1e-3,
+                 lr_pol=1e-3,
+                 buf_size=int(1e5),
+                 batch_size=64,
+                 tau=1e-3,
+                 device="cpu",
+                 max_grad_norm=0.5,
+                 noise_process=None,
+                 min_act=None,
+                 max_act=None,
+                 learn_every=1,
+                 warm_up=1e2,
+                 seed=0):
+        super().__init__()
         self.policy_net = policy_net
         self.policy_net_target = copy.deepcopy(policy_net)
         self.value_net = value_net
@@ -42,27 +39,19 @@ class DDPG:
         self.batch_size = batch_size
         self.gamma = gamma
         self.device = device
+        self.min_act = min_act
+        self.max_act = max_act
         self.tau = tau
-        self.normalize_rewards = normalize_rewards
+        self.learn_every = learn_every
         self.max_grad_norm = max_grad_norm
         self.seed = random.seed(seed)
         self.warm_up = warm_up
-        self.env = env
-        self.action_space = gym.make(env_id).action_space
         self.noise_process = noise_process
-        if isinstance(self.action_space, gym.spaces.Box):
-            self.min_act = self.action_space.low
-            self.max_act = self.action_space.high
-        elif isinstance(self.action_space, gym.spaces.Discrete):
-            self.action_size = self.action_space.n
-        else:
-            print("action space should be Discrete or Box")
-        
-        self.experience_index = 0
-        value_net.to(device)        
-        policy_net.to(device)
-        value_net_target.to(device)        
-        policy_net_target.to(device)
+        self.exp_index = 0
+        self.value_net.to(device)        
+        self.policy_net.to(device)
+        self.value_net_target.to(device)        
+        self.policy_net_target.to(device)
         self.val_optimizer = torch.optim.Adam(value_net.parameters(), 
                                                 lr=lr_val)
         self.pol_optimizer = torch.optim.Adam(policy_net.parameters(),
@@ -72,33 +61,28 @@ class DDPG:
 
     def act(self, state, test=False):
         if len(self.replay_buffer) < self.warm_up: 
-            return self.action_space.sample()
+            return np.random.uniform(self.min_act, self.max_act)
 
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         with torch.no_grad():
             action = self.policy_net(state)
-        if ((not test) and isinstance(self.action_space, gym.spaces.Box)):
+
+        action = action.squeeze(0).detach().cpu().numpy()
+        if (not test) and (self.noise_process is not None):
             action = action + self.noise_process.step()
             action = np.clip(action, -1, 1)
-        
-        if isinstance(self.action_space, gym.spaces.Discrete):
-            action = misc.onehot_to_index(action, self.action_size)
-        elif isinstance(self.action_space, gym.spaces.Box):
-            action = misc.tanh_expand(self.min_act, self.max_act, action)
-        action = action.squeeze(0).detach().cpu().numpy()
+        action = misc.tanh_expand(self.min_act, self.max_act, action)
         return action
 
     def step(self, state, action, reward, next_state, done):
-        self.experience_index += 1
-        
-        if isinstance(self.action_space, gym.spaces.Discrete):
-            action = misc.index_to_onehot(action, )
-        elif isinstance(self.action_space, gym.spaces.Box):
-            action = misc.squish_tanh(self.min_act, self.max_act, action)
-
+        self.exp_index += 1
+        action = misc.squish_tanh(self.min_act, self.max_act, action)
         self.replay_buffer.add(state, action, reward, next_state, done)
+
         if (len(self.replay_buffer) > self.batch_size and
-                self.experience_index > self.warm_up):
+            self.exp_index > self.warm_up and 
+            self.exp_index % self.learn_every == 0):
+            
             experience_batch = self.replay_buffer.sample()
             self.learn(experience_batch)
         
@@ -128,7 +112,9 @@ class DDPG:
         model_utils.soft_update_model(self.value_net, 
             self.value_net_target, self.tau)
         
-    def train():
-        asdf
-    def test():
-        adf
+    def save(self, fname):
+        torch.save({"network": self.policy_net.state_dict()}, fname)
+
+    def load(self, fname):
+        dat = torch.load(fname)
+        self.policy_net.load_state_dict(dat["network"])

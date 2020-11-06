@@ -20,7 +20,6 @@ class A2C(ActorCritic):
                  max_grad_norm=0.5,
                  critic_coef=0.5,
                  entropy_coef=0.01,
-                 warm_up=100,
                  gail=False,
                  use_gae=False,
                  ):
@@ -42,15 +41,10 @@ class A2C(ActorCritic):
         self.max_grad_norm = max_grad_norm
         self.critic_coef = critic_coef
         self.entropy_coef = entropy_coef
-        self.warm_up = warm_up
         self.action_space = self.envs.action_space
 
     def act(self, state, deterministic=False):
-        if self.exp_index < self.warm_up: 
-            self.exp_index += 1
-            return self.action_space.sample()
         state = torch.from_numpy(state).unsqueeze(0).float().to(self.device)
-
         with torch.no_grad():
             actor_dist, val = self.actor_critic(state)
         

@@ -5,19 +5,19 @@ from pytorch_drl.utils.layers.noisy_linear import NoisyLinear
 
 class RainbowNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size, atoms):
+    def __init__(self, state_size, action_size, atoms, H=64):
         super(RainbowNetwork, self).__init__()
         self.action_size = action_size
         self.state_size = state_size
         self.atoms = atoms
 
-        self.feature = nn.Linear(state_size, 128)
+        self.feature = nn.Linear(state_size, H)
         
-        self.advantage_n1 = NoisyLinear(128, 128)
-        self.advantage_n2 = NoisyLinear(128, action_size*atoms)
+        self.advantage_n1 = NoisyLinear(H, H)
+        self.advantage_n2 = NoisyLinear(H, action_size*atoms)
         
-        self.value_n1 = NoisyLinear(128, 128)
-        self.value_n2 = NoisyLinear(128, 1*atoms)
+        self.value_n1 = NoisyLinear(H, H)
+        self.value_n2 = NoisyLinear(H, 1*atoms)
         
         
     def forward(self, state, log=False):
@@ -50,7 +50,7 @@ class RainbowNetwork(nn.Module):
 
 class DQNNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size, H=128):
+    def __init__(self, state_size, action_size, H=64):
         super().__init__()
         self.feature = nn.Sequential(
             nn.Linear(state_size, H),
@@ -66,18 +66,18 @@ class DQNNetwork(nn.Module):
 
 class QRDQNNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size, n_quants):
+    def __init__(self, state_size, action_size, n_quants, H=64):
         super(QRDQNNetwork, self).__init__()
         self.action_size = action_size
         self.state_size = state_size
         self.n_quants = n_quants
 
         self.feature = nn.Sequential(
-            nn.Linear(state_size, 128),
+            nn.Linear(state_size, H),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(H, H),
             nn.ReLU(),
-            nn.Linear(128, action_size*n_quants)
+            nn.Linear(H, action_size*n_quants)
         )
         
         
@@ -89,19 +89,19 @@ class QRDQNNetwork(nn.Module):
 
 class QRRainbowNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size, atoms):
+    def __init__(self, state_size, action_size, atoms, H=64):
         super(QRRainbowNetwork, self).__init__()
         self.action_size = action_size
         self.state_size = state_size
         self.atoms = atoms
 
-        self.feature = nn.Linear(state_size, 128)
+        self.feature = nn.Linear(state_size, H)
         
-        self.advantage_n1 = NoisyLinear(128, 128)
-        self.advantage_n2 = NoisyLinear(128, action_size*atoms)
+        self.advantage_n1 = NoisyLinear(H, H)
+        self.advantage_n2 = NoisyLinear(H, action_size*atoms)
         
-        self.value_n1 = NoisyLinear(128, 128)
-        self.value_n2 = NoisyLinear(128, 1*atoms)
+        self.value_n1 = NoisyLinear(H, H)
+        self.value_n2 = NoisyLinear(H, 1*atoms)
         
         
     def forward(self, state, log=False):
@@ -132,11 +132,11 @@ class QRRainbowNetwork(nn.Module):
 
 class NoisyRainbowNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, H=64):
         super().__init__()        
-        self.linear = nn.Linear(state_size, 128)
-        self.n2 = NoisyLinear(128, 128)
-        self.n3 = NoisyLinear(128, action_size)
+        self.linear = nn.Linear(state_size, H)
+        self.n2 = NoisyLinear(H, H)
+        self.n3 = NoisyLinear(H, action_size)
         
       
     def forward(self, state):
@@ -150,13 +150,13 @@ class NoisyRainbowNetwork(nn.Module):
         
 class NoisyDuelingRainbowNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, H=64):
         super().__init__()
-        self.feature = nn.Linear(state_size, 128)
-        self.advantage_n1 = NoisyLinear(128, 128)
-        self.advantage_n2 = NoisyLinear(128, action_size)
-        self.value_n1 = NoisyLinear(128, 128)
-        self.value_n2 = NoisyLinear(128, 1)
+        self.feature = nn.Linear(state_size, H)
+        self.advantage_n1 = NoisyLinear(H, H)
+        self.advantage_n2 = NoisyLinear(H, action_size)
+        self.value_n1 = NoisyLinear(H, H)
+        self.value_n2 = NoisyLinear(H, 1)
         
         
     def forward(self, state, log=False):
@@ -180,23 +180,23 @@ class NoisyDuelingRainbowNetwork(nn.Module):
 
 class DuelingRainbowNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, H=64):
         super().__init__()        
         self.feature = nn.Sequential(
-            nn.Linear(state_size, 128),
+            nn.Linear(state_size, H),
             nn.ReLU()
             )
 
         self.advantage = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(H, H),
             nn.ReLU(),
-            nn.Linear(128, action_size)
+            nn.Linear(H, action_size)
             )
 
         self.value = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(H, H),
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(H, 1)
             )
         
     def forward(self, state):

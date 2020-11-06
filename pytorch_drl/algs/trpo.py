@@ -27,7 +27,6 @@ class TRPO(ActorCritic):
                  max_grad_norm=0.5,
                  gail=False,
                  use_gae=True,
-                 warm_up=0,
                  ):
         super().__init__()
 
@@ -43,7 +42,6 @@ class TRPO(ActorCritic):
         self.actor = actor
         self.critic = critic
         self.device = device
-        self.warm_up = warm_up
         self.tau = tau 
         self.n_env = n_env
         self.actor.to(device)
@@ -58,11 +56,7 @@ class TRPO(ActorCritic):
         self.max_grad_norm = max_grad_norm
         
     def act(self, state, deterministic=False):
-        if self.exp_index < self.warm_up: 
-            self.exp_index += 1
-            return self.action_space.sample()
         state = torch.from_numpy(state).unsqueeze(0).float().to(self.device)
-
         with torch.no_grad():
             actor_dist = self.actor(state)
         
@@ -74,13 +68,13 @@ class TRPO(ActorCritic):
         return action
     
     def _sample_action(self, state, grad):
-            # Assumes only actor_critic combined models will be used
-            with torch.set_grad_enabled(grad):
-                actor_dist = self.actor(state)
-            action = actor_dist.sample()
-            log_prob = actor_dist.log_prob(action)
-            # action: tensor of shape: (B, *action_space.shape)
-            return action, log_prob, actor_dist
+        # Assumes only actor_critic combined models will be used
+        with torch.set_grad_enabled(grad):
+            actor_dist = self.actor(state)
+        action = actor_dist.sample()
+        log_prob = actor_dist.log_prob(action)
+        # action: tensor of shape: (B, *action_space.shape)
+        return action, log_prob, actor_dist
 
     def collect_trajectories(self, tmax):
         device = self.device

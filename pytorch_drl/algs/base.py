@@ -14,12 +14,16 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def load(self, fname):
+    def load(self, fname): 
+        """assumes no more training will happen"""
         pass
 
 # ======================================================================
 
 class ActorCritic(Agent):
+    
+    def __init__(self):
+        super().__init__()
 
     @abstractmethod
     def act(self, state, deterministic=False):
@@ -137,6 +141,9 @@ class ActorCritic(Agent):
 # ======================================================================
 
 class ValueBased(Agent):
+
+    def __init__(self):
+        super().__init__()
     
     @abstractmethod
     def act(self, state, test=False):
@@ -171,14 +178,14 @@ class ValueBased(Agent):
         scores_window = deque(maxlen=100)
         test_scores = []
         test_scores_window = deque(maxlen=100)
-        for i_episode in range(1, n_episodes+1):
-            render = (render_freq and (i_episode % render_freq == 0))
+        for i in range(1, n_episodes+1):
+            render = (render_freq and (i % render_freq == 0))
             score = self.train_episode(env, tmax, render)
             scores_window.append(score)
             scores.append(score)
-            avg_score = np.mean(scores_window)
+            avg_s = np.mean(scores_window)
 
-            if (test_freq is not None) and (i_episode % test_freq == 0):
+            if (test_freq is not None) and (i % test_freq == 0):
                 t_score = self.test(env)
                 test_scores.append(t_score)
                 test_scores_window.append(t_score)
@@ -186,21 +193,21 @@ class ValueBased(Agent):
 
             print("\rAvg score: {:.2f} i: {}".format(avg_s, i).ljust(48),
                          end="")
-            if avg_score >= max_score:
-                print("Solved! Episode {}".format(i_episode))
+            if avg_s >= max_score:
+                print("Solved! Episode {}".format(i))
                 if save_models:
                     fname = "checkpoints/{}.pth".format(alg_name)
-                    torch.save(agent.online_net.state_dict(), fname)
+                    self.save(fname)
                 break
         env.close()
         return scores
 
-    def test(self, env, render=False, n_episodes=1):
+    def test(self, env, tmax, render=False, n_episodes=1):
         score_avg = 0
         for i in range(n_episodes):
             state = env.reset()
             score = 0
-            while True:
+            for i in range(tmax):
                 action = self.act(state, test=True)
                 state, reward, done, _ = env.step(action)
                 if render:

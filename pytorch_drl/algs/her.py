@@ -19,7 +19,7 @@ class HER:
             raise ValueError
         
     def train(self, n_traj, t_max, n_epochs, max_score, render_freq=None, 
-                test_freq=10, save_models=False, checkpoint_name=None, 
+                test_freq=1, save_models=False, checkpoint_name=None, 
                 strategy=None, n_strategy=10): 
         
         if strategy == 'final':
@@ -36,14 +36,15 @@ class HER:
         test_scores = []
         test_scores_window = deque(maxlen=100)
         for i_episode in range(1, n_traj+1):
-            render = (render_freq is not None) and (i_episode % render_freq == 0)
+            render = ((render_freq is not None) 
+                        and (i_episode % render_freq == 0))
             score = self.train_episode(t_max, n_epochs, n_strategy, strategy, 
                                         render=render)
             
             scores_window.append(score)
             scores.append(score)
             avg_score = np.mean(scores_window)
-            if (test_freq is not None) and (i_episode % test_freq == 0):
+            if (i_episode % test_freq == 0):
                 t_score = self.test(t_max, render=False)
                 test_scores.append(t_score)
                 test_scores_window.append(t_score)
@@ -73,7 +74,8 @@ class HER:
             action = self.agent.act(concat(state, goal))
             if render:
                 self.env.render()
-            (next_state, next_goal), reward, done, info = self.env.step(action)
+            (next_state, next_goal), \
+                reward, done, info = self.env.step(action)
             episode.append((state, goal, action, 
                             reward, next_state, done, info))
             state = next_state
@@ -113,7 +115,6 @@ class HER:
                 if done:
                     break
             score_avg += score
-            #print(score)
         self.env.close()
         return score_avg/num_of_episodes
 

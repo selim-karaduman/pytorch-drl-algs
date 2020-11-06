@@ -25,7 +25,6 @@ class ACKTR(ActorCritic):
                  normalize_rewards=False,
                  gail=False,
                  use_gae=True,
-                 warm_up=0,
                  ):
         super().__init__()
 
@@ -34,7 +33,6 @@ class ACKTR(ActorCritic):
         self.on_policy_updates = True
         self.gamma = gamma
         self.actor_critic = actor_critic
-        self.warm_up = 0
         self.device = device
         self.tau = tau
         self.n_env = n_env
@@ -50,11 +48,7 @@ class ACKTR(ActorCritic):
         self.entropy_coef = entropy_coef
         
     def act(self, state, deterministic=False):
-        if self.exp_index < self.warm_up: 
-            self.exp_index += 1
-            return self.action_space.sample()
         state = torch.from_numpy(state).unsqueeze(0).float().to(self.device)
-
         with torch.no_grad():
             actor_dist, val = self.actor_critic(state)
         

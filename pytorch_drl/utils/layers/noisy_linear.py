@@ -4,11 +4,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.autograd import Variable
-# From: https://github.com/higgsfield/RL-Adventure/blob/master/5.noisy%20dqn.ipynb
+# From: https://github.com/higgsfield/RL-Adventure
+#   /blob/master/5.noisy%20dqn.ipynb
 
 class NoisyLinear(nn.Module):
 
-    def __init__(self, in_size, out_size, std_init=0.4):
+    def __init__(self, in_size, out_size, std_init=0.5):
         super().__init__()
         self.in_size = in_size
         self.out_size = out_size
@@ -35,9 +36,7 @@ class NoisyLinear(nn.Module):
         v_in = self._scale_noise(self.in_size)
         v_out = self._scale_noise(self.out_size)
         self.weight_eps.copy_(v_out.ger(v_in))
-        self.bias_eps.copy_(torch.randn(self.out_size))
-        # self.bias_eps.copy_(v_out)
-        
+        self.bias_eps.copy_(v_out)
 
     def reset_parameters(self):
         mu_range = 1 / math.sqrt(self.in_size)
