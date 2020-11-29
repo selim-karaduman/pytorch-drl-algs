@@ -21,7 +21,7 @@ class TRPO(ActorCritic):
                  damping_coeff=0.1,
                  env_id=None,
                  gamma=0.99, 
-                 tau=0.95,
+                 gae_tau=0.95,
                  n_env=8,
                  device="cpu",
                  max_grad_norm=0.5,
@@ -42,7 +42,7 @@ class TRPO(ActorCritic):
         self.actor = actor
         self.critic = critic
         self.device = device
-        self.tau = tau 
+        self.gae_tau = gae_tau 
         self.n_env = n_env
         self.actor.to(device)
         self.critic.to(device)
@@ -126,7 +126,7 @@ class TRPO(ActorCritic):
                 delta = rewards[t] - values[t] + self.gamma * next_val
                 advantage = (delta 
                                 + advantage * self.gamma 
-                                    * self.tau * (1 - dones[t]))
+                                    * self.gae_tau * (1 - dones[t]))
                 v_targs.insert(0, advantage + values[t])
             else:
                 fut_ret = rewards[t] + self.gamma * fut_ret * (1 - dones[t])

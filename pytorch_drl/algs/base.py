@@ -91,12 +91,12 @@ class ActorCritic(Agent):
                     break
         return scores, losses
 
-    def test(self, env, render=False, n_episodes=1):
+    def test(self, env, render=False, n_episodes=1, tmax=200):
         score_avg = 0
         for i in range(n_episodes):
             state = env.reset()
             score = 0
-            while True:
+            for tt in range(tmax):
                 action = self.act(state)
                 state, reward, done, _ = env.step(action)
                 if render:

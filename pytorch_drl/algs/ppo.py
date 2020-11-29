@@ -19,7 +19,7 @@ class PPO(ActorCritic):
                  gamma=0.99, 
                  epochs=4, 
                  lr=1e-3, 
-                 tau=0.95,
+                 gae_tau=0.95,
                  n_env=8,
                  device="cpu",
                  normalize_rewards=False,
@@ -41,12 +41,13 @@ class PPO(ActorCritic):
         self.epochs = epochs
         self.actor_critic = actor_critic
         self.device = device
-        self.tau = tau
+        self.gae_tau = gae_tau
         self.n_env = n_env
         self.normalize_rewards = normalize_rewards
         self.actor_critic.to(device)
         self.mini_batch_size = mini_batch_size
-        self.optimizer = torch.optim.Adam(self.actor_critic.parameters(), lr=lr)
+        self.optimizer = torch.optim.Adam(self.actor_critic.parameters(), 
+                                            lr=lr)
         self.envs = ParallelEnv(env_id, n=n_env)
         self.action_space = self.envs.action_space
         self.cur_tr_step = self.envs.reset()
@@ -122,7 +123,7 @@ class PPO(ActorCritic):
                 delta = rewards[t] - values[t] + self.gamma * next_val
                 advantage = (delta 
                                 + advantage * self.gamma 
-                                    * self.tau * (1 - dones[t]))
+                                    * self.gae_tau * (1 - dones[t]))
                 v_targs.insert(0, advantage + values[t])
             else:
                 fut_ret = rewards[t] + self.gamma * fut_ret * (1 - dones[t])
@@ -139,7 +140,8 @@ class PPO(ActorCritic):
         cur_dist, cur_val = self.actor_critic(states)
         cur_log_probs = cur_dist.log_prob(actions)
         ratio = (cur_log_probs - log_probs.detach()).exp()
-        clip = torch.clamp(ratio, 1 - self.epsilon.value, 1 + self.epsilon.value)
+        clip = torch.clamp(ratio, 1 - self.epsilon.value, 
+                            1 + self.epsilon.value)
         actor_loss = -torch.min(ratio * advantages, clip * advantages).mean()
         critic_loss = (cur_val - v_targs.detach()).pow(2).mean()
         entropy_loss = -cur_dist.entropy().mean()

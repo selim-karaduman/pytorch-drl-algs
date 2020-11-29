@@ -20,7 +20,7 @@ class GAIL:
                  ppo_epochs=4,
                  lr_ppo=None, 
                  lr_discriminator=None,
-                 tau=0.95,
+                 gae_tau=0.95,
                  n_env=8,
                  device="cpu",
                  max_grad_norm=None,
@@ -39,7 +39,7 @@ class GAIL:
         self.action_size = action_size
         self.env_id = env_id
         self.gamma = gamma
-        self.tau = tau
+        self.gae_tau = gae_tau
         self.n_env = n_env
         self.expert_trajectories = expert_trajectories
         self.normalize_rewards = normalize_rewards
@@ -56,7 +56,7 @@ class GAIL:
                              gamma=gamma, 
                              epochs=ppo_epochs, 
                              lr=lr_ppo, 
-                             tau=tau,
+                             gae_tau=gae_tau,
                              n_env=n_env,
                              device=device,
                              max_grad_norm=max_grad_norm,
@@ -122,7 +122,7 @@ class GAIL:
                 fut_ret = rewards[t] + self.gamma * fut_ret * (1 - dones[t])
                 next_val = values[t + 1] * (1 - dones[t])
                 delta = rewards[t] - (values[t] - self.gamma * next_val)
-                gae = delta + gae * self.gamma * self.tau * (1 - dones[t])
+                gae = delta + gae * self.gamma * self.gae_tau * (1 - dones[t])
                 advantages.insert(0, gae)
                 v_targs.insert(0, gae + values[t])
             advantages = torch.cat(advantages)
