@@ -102,8 +102,6 @@ class GAIL:
                 real_probs = self.discriminator(real_pairs)
                 fake_probs = self.discriminator(fake_pairs)
                 discriminator_loss = (
-                    #d_loss(real_probs, torch.ones_like(real_probs)) + 
-                    #d_loss(fake_probs, torch.zeros_like(fake_probs))
                     d_loss(real_probs, torch.zeros_like(real_probs)) + 
                     d_loss(fake_probs, torch.ones_like(fake_probs))
                     )

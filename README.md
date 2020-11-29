@@ -23,7 +23,7 @@
 - [**HER**](https://arxiv.org/abs/1707.01495) [[code](https://github.com/selim-karaduman/pytorch_drl/blob/master/pytorch_drl/algs/her.py)] [[tests](https://github.com/selim-karaduman/pytorch_drl/blob/master/tests/her_test.ipynb)]
 - [**MADDPG**](https://arxiv.org/abs/1706.02275) [[code](https://github.com/selim-karaduman/pytorch_drl/blob/master/pytorch_drl/algs/maddpg.py)] [[tests](https://github.com/selim-karaduman/pytorch_drl/blob/master/tests/maddpg_test.ipynb)]
 
-**Note:** Not tested thoroughly. Gail had problems. For tests check [**/tests**](https://github.com/selim-karaduman/pytorch_drl/tree/master/tests)
+**Note:** Not tested thoroughly. Not to be used for anything serious
 
 ---
 ***
