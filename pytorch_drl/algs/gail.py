@@ -3,9 +3,13 @@ import numpy as np
 from collections import deque
 from pytorch_drl.algs.ppo import PPO
 import torch.nn.functional as F
+import pytorch_drl.utils.misc as misc
 
 """
 PPO GAIL
+This is experimental: ppo.py is used, 
+    which is implemented with the assumption that 
+    the environment will signal the reward.
 """
 class GAIL:
 
@@ -19,7 +23,7 @@ class GAIL:
                  gail_epochs=1,
                  ppo_epochs=4,
                  lr_ppo=None, 
-                 lr_discriminator=None,
+                 lr_discriminator=1e-3,
                  gae_tau=0.95,
                  n_env=8,
                  device="cpu",
@@ -46,11 +50,8 @@ class GAIL:
         self.normalize_rewards = normalize_rewards
         self.gail_epochs = gail_epochs
         
-        if lr_discriminator is None:
-            self.optimizer = torch.optim.Adam(self.discriminator.parameters())
-        else:
-            self.optimizer = torch.optim.Adam(self.discriminator.parameters(),
-                                                 lr=lr_discriminator)
+        self.optimizer = torch.optim.Adam(self.discriminator.parameters(),
+                                            lr=lr_discriminator)
 
         self.ppo_agent = PPO(self.actor_critic, 
                              env_id,
@@ -91,37 +92,33 @@ class GAIL:
             log_probs, states, actions, values, dones = args
             
             real_pairs = self.sample_real_pairs(batch_size)
-            actions_one_hot = torch.eye(self.action_size)[actions]\
-                                .float().to(self.device)
+            actions_one_hot = misc.index_to_onehot(actions, self.action_size)\
+                                    .float().to(self.device)
             fake_pairs = torch.cat([states, actions_one_hot], -1)
 
             for i in range(self.gail_epochs):
                 # Train discriminator
                 self.discriminator.zero_grad()
-                real_logits = self.discriminator(real_pairs)
-                fake_logits = self.discriminator(fake_pairs)
+                real_probs = self.discriminator(real_pairs)
+                fake_probs = self.discriminator(fake_pairs)
                 discriminator_loss = (
-                    d_loss(real_logits, torch.ones_like(real_logits)) + 
-                    d_loss(fake_logits, torch.zeros_like(fake_logits))
+                    #d_loss(real_probs, torch.ones_like(real_probs)) + 
+                    #d_loss(fake_probs, torch.zeros_like(fake_probs))
+                    d_loss(real_probs, torch.zeros_like(real_probs)) + 
+                    d_loss(fake_probs, torch.ones_like(fake_probs))
                     )
                 discriminator_loss.backward()
                 self.optimizer.step()
 
             # change returns with discriminator estimation
-            fake_logits = self.discriminator(fake_pairs).detach()
-            rewards = torch.log(fake_logits)
+            fake_probs = self.discriminator(fake_pairs).detach()
+            rewards = -torch.log(fake_probs)
 
-            if self.normalize_rewards:
-                mean_rew = rewards.mean()
-                std_rew = rewards.std()
-                rewards = (rewards - mean_rew)/(std_rew+1e-8)
             # GAE:
-            fut_ret = values[-1]
             gae = 0
             advantages = []
             v_targs = []
             for t in reversed(range(rewards.shape[0])):
-                fut_ret = rewards[t] + self.gamma * fut_ret * (1 - dones[t])
                 next_val = values[t + 1] * (1 - dones[t])
                 delta = rewards[t] - (values[t] - self.gamma * next_val)
                 gae = delta + gae * self.gamma * self.gae_tau * (1 - dones[t])
@@ -129,9 +126,11 @@ class GAIL:
                 v_targs.insert(0, gae + values[t])
             advantages = torch.cat(advantages)
             v_targs = torch.cat(v_targs)
+            # log_probs, states, actions, advantages, v_targs = args
+            args = (log_probs, states, actions, advantages, v_targs)
             self.ppo_agent.learn(args)
             
-            # ============================= TEST =============================
+            # ============================= TEST =======================
             if e % test_freq == 0:
                 score = self.ppo_agent.test(test_env)
                 scores.append(score)
@@ -147,8 +146,8 @@ class GAIL:
         
         return scores, losses
 
-    def test(self, env, render=False, n_times=1):
-        self.ppo_agent.test(env, render=render, n_times=n_times)
+    def test(self, env, render=False, n_episodes=1):
+        self.ppo_agent.test(env, render=render, n_episodes=n_episodes)
 
     def save(self, fname):
         self.ppo_agent.save(fname)

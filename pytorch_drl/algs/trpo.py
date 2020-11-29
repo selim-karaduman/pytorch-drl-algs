@@ -69,7 +69,7 @@ class TRPO(ActorCritic):
         action = self.convert_to_numpy(action)
         return action
     
-    def _sample_action(self, state, grad):
+    def _sample_action(self, state):
         # Assumes only actor_critic combined models will be used
         actor_dist = self.actor(state)
         action = actor_dist.sample()

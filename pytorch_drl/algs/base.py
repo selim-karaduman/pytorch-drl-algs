@@ -118,7 +118,7 @@ class ActorCritic(Agent):
         for i in range(n_steps):
             with torch.no_grad():
                 state_t = torch.from_numpy(state).float().to(self.device)
-                action = self._sample_action(state_t, grad=False)[0]
+                action = self._sample_action(state_t)[0]
             action_np = action.detach().cpu().numpy()
             next_state, reward, done, _ = self.envs.step(action_np)
             states.append(state)
