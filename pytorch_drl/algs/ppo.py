@@ -9,7 +9,10 @@ from pytorch_drl.utils.parallel_env import ParallelEnv
 from pytorch_drl.utils.schedule import LinearSchedule
 
 class PPO(ActorCritic):
-
+    """
+    tmax: Maximum number of steps in the 
+            environment to avoid non-ending cases
+    """
     def __init__(self, 
                  actor_critic, 
                  env_id,
@@ -29,6 +32,7 @@ class PPO(ActorCritic):
                  mini_batch_size=32,
                  gail=False,
                  use_gae=True,
+                 tmax=200,
                  ):
         super().__init__()
 
@@ -47,7 +51,7 @@ class PPO(ActorCritic):
         self.mini_batch_size = mini_batch_size
         self.optimizer = torch.optim.Adam(self.actor_critic.parameters(), 
                                             lr=lr)
-        self.envs = ParallelEnv(env_id, n=n_env)
+        self.envs = ParallelEnv(env_id, n=n_env, tmax=tmax)
         self.action_space = self.envs.action_space
         self.cur_tr_step = self.envs.reset()
         self.max_grad_norm = max_grad_norm

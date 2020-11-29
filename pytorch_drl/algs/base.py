@@ -66,7 +66,7 @@ class ActorCritic(Agent):
     
 
     def train(self, tmax, n_episodes, test_env, max_score, 
-                model_name, test_freq=1, det_test=False):
+                model_name, test_freq=1):
         losses = []
         scores = []
         last_scores = deque(maxlen=100)
@@ -78,7 +78,7 @@ class ActorCritic(Agent):
             last_losses.append(avg_loss)
             avg_loss_tot = np.mean(last_losses)
             if i % test_freq == 0:
-                score = self.test(test_env)
+                score = self.test(test_env, tmax=tmax)
                 scores.append(score)
                 last_scores.append(score)
                 avg_s = np.mean(last_scores)        
@@ -179,14 +179,14 @@ class ValueBased(Agent):
         test_scores = []
         test_scores_window = deque(maxlen=100)
         for i in range(1, n_episodes+1):
-            render = (render_freq and (i % render_freq == 0))
+            render = ((render_freq is not None) and (i % render_freq == 0))
             score = self.train_episode(env, tmax, render)
             scores_window.append(score)
             scores.append(score)
             avg_s = np.mean(scores_window)
 
             if (test_freq is not None) and (i % test_freq == 0):
-                t_score = self.test(env)
+                t_score = self.test(env, tmax, render=render)
                 test_scores.append(t_score)
                 test_scores_window.append(t_score)
                 print("Avg Test score: ", np.mean(test_scores_window))

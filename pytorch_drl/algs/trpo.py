@@ -10,7 +10,10 @@ import pytorch_drl.utils.math as math_utils
 import pytorch_drl.utils.model_utils as model_utils
 
 class TRPO(ActorCritic):
-
+    """
+    tmax: Maximum number of steps in the 
+            environment to avoid non-ending cases
+    """
     def __init__(self, 
                  actor,
                  critic,
@@ -27,6 +30,7 @@ class TRPO(ActorCritic):
                  max_grad_norm=0.5,
                  gail=False,
                  use_gae=True,
+                 tmax=200,
                  ):
         super().__init__()
 
@@ -48,7 +52,7 @@ class TRPO(ActorCritic):
                                     self.critic.parameters(), 
                                     lr=critic_lr
                                     )
-        self.envs = ParallelEnv(env_id, n=n_env)
+        self.envs = ParallelEnv(env_id, n=n_env, tmax=tmax)
         self.action_space = self.envs.action_space
         self.cur_tr_step = self.envs.reset()
         self.max_grad_norm = max_grad_norm

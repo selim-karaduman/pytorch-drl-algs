@@ -28,7 +28,8 @@ class GAIL:
                  entropy_coef=0.01,
                  mini_batch_size=32,
                  normalize_rewards=True,
-                 buf_len=10e4
+                 buf_len=10e4,
+                 tmax=200,
                  ):
     
         self.actor_critic = actor_critic
@@ -64,7 +65,8 @@ class GAIL:
                              entropy_coef=entropy_coef,
                              mini_batch_size=mini_batch_size,
                              normalize_rewards=normalize_rewards,
-                             gail=True)
+                             gail=True,
+                             tmax=tmax)
         
     def act(self, state):
         return self.ppo_agent.act(state)

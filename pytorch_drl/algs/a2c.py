@@ -8,7 +8,10 @@ from pytorch_drl.algs.base import ActorCritic
 from pytorch_drl.utils.parallel_env import ParallelEnv
 
 class A2C(ActorCritic):
-
+    """
+    tmax: Maximum number of steps in the 
+            environment to avoid non-ending cases
+    """
     def __init__(self, 
                  actor_critic, 
                  env_id,
@@ -22,6 +25,7 @@ class A2C(ActorCritic):
                  entropy_coef=0.01,
                  gail=False,
                  use_gae=False,
+                 tmax=205,
                  ):
 
         super().__init__()
@@ -35,7 +39,7 @@ class A2C(ActorCritic):
         self.actor_critic.to(device)
         self.optimizer = torch.optim.Adam(self.actor_critic.parameters(),
                                              lr=lr)
-        self.envs = ParallelEnv(env_id, n=n_env, seed=0)
+        self.envs = ParallelEnv(env_id, n=n_env, seed=0, tmax=tmax)
         self.cur_tr_step = self.envs.reset()
         self.max_grad_norm = max_grad_norm
         self.critic_coef = critic_coef

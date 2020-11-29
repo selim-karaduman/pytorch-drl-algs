@@ -9,7 +9,10 @@ from pytorch_drl.utils.kfac import KFACOptimizer
 from pytorch_drl.utils.parallel_env import ParallelEnv
 
 class ACKTR(ActorCritic):
-
+    """
+    tmax: Maximum number of steps in the 
+            environment to avoid non-ending cases
+    """
     def __init__(self, 
                  actor_critic,
                  env_id,
@@ -25,6 +28,7 @@ class ACKTR(ActorCritic):
                  normalize_rewards=False,
                  gail=False,
                  use_gae=True,
+                 tmax=205 
                  ):
         super().__init__()
 
@@ -39,7 +43,7 @@ class ACKTR(ActorCritic):
         self.actor_critic.to(device)
         self.optimizer = KFACOptimizer(self.actor_critic, lr=lr)
         
-        self.envs = ParallelEnv(env_id, n=n_env)
+        self.envs = ParallelEnv(env_id, n=n_env, tmax=tmax)
         self.action_space = self.envs.action_space
         self.cur_tr_step = self.envs.reset()
         self.max_grad_norm = max_grad_norm

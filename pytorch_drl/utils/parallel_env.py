@@ -119,20 +119,25 @@ class VecEnv(ABC):
             return self
 
 
-def worker(remote, parent_remote, env_fn_wrapper):
+def worker(remote, parent_remote, env_fn_wrapper, tmax):
     parent_remote.close()
     env = env_fn_wrapper.x
+    t = 0
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
             ob, reward, done, info = env.step(data)
-            if done:
+            t += 1
+            if done or t >= tmax:
+                t = 0
                 ob = env.reset()
             remote.send((ob, reward, done, info))
         elif cmd == 'reset':
+            t = 0
             ob = env.reset()
             remote.send(ob)
         elif cmd == 'reset_task':
+            t = 0
             ob = env.reset_task()
             remote.send(ob)
         elif cmd == 'close':
@@ -152,9 +157,7 @@ def __init__(self, n, env_constr, *args):
 """
 
 class ParallelEnv(VecEnv):
-    def __init__(self, env_name,
-                 n=4, seed=None,
-                 spaces=None):
+    def __init__(self, env_name, n=4, seed=None, spaces=None, tmax=200):
 
         env_fns = [ gym.make(env_name) for _ in range(n) ]
 
@@ -173,7 +176,8 @@ class ParallelEnv(VecEnv):
         self.ps = [Process(target=worker, 
                             args=(work_remote, 
                                     remote, 
-                                    CloudpickleWrapper(env_fn)))
+                                    CloudpickleWrapper(env_fn),
+                                    tmax))
                     for (work_remote, remote, env_fn) in 
                         zip(self.work_remotes, self.remotes, env_fns)]
         for p in self.ps:
