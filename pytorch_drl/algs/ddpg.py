@@ -64,9 +64,10 @@ class DDPG(ValueBased):
             return np.random.uniform(self.min_act, self.max_act)
 
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
+        self.policy_net.eval()
         with torch.no_grad():
             action = self.policy_net(state)
-
+        self.policy_net.train()
         action = action.squeeze(0).detach().cpu().numpy()
         if (not test) and (self.noise_process is not None):
             action = action + self.noise_process.step()

@@ -53,6 +53,8 @@ class _DDPG:
     def act(self, state, test=False, batched=False, 
             grad=False, use_th=False, target=False):
         if not batched:
+            self.policy_net.eval()
+            self.policy_net_target.eval()
             state = torch.from_numpy(state)\
                         .float().unsqueeze(0).to(self.device)
         
@@ -70,6 +72,8 @@ class _DDPG:
             onehot = F.gumbel_softmax(x, hard=True)
         
         if not batched:
+            self.policy_net.train()
+            self.policy_net_target.train()
             onehot = onehot.squeeze(0)
         
         if not use_th:

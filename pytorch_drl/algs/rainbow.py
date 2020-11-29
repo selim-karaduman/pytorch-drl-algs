@@ -151,12 +151,10 @@ class Rainbow(ValueBased):
         if (not self.noisy) and (not test) and (random.random() < eps):
             action = random.choice(np.arange(self.action_size))
         else:
-            if test: # test
-                self.online_net.eval()
+            self.online_net.eval()
             with torch.no_grad():
                 action = self.get_best_action(state)
-            if test:
-                self.online_net.train()
+            self.online_net.train()
         self.eps_schedule.step()
         return action
 

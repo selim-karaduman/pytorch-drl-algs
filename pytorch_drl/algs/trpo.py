@@ -31,9 +31,7 @@ class TRPO(ActorCritic):
         super().__init__()
 
         self.gail = gail
-        self.use_gae = use_gae
-        self.on_policy_updates = True
-        
+        self.use_gae = use_gae        
         self.gamma = gamma
         self.damping_coeff = damping_coeff
         self.max_kl = max_kl
@@ -69,8 +67,7 @@ class TRPO(ActorCritic):
     
     def _sample_action(self, state, grad):
         # Assumes only actor_critic combined models will be used
-        with torch.set_grad_enabled(grad):
-            actor_dist = self.actor(state)
+        actor_dist = self.actor(state)
         action = actor_dist.sample()
         log_prob = actor_dist.log_prob(action)
         # action: tensor of shape: (B, *action_space.shape)
@@ -90,7 +87,7 @@ class TRPO(ActorCritic):
         for i in range(tmax):
             state = torch.from_numpy(state).float().to(device)
             action, log_prob, a_dist = \
-                self._sample_action(state, grad=self.on_policy_updates)
+                self._sample_action(state)
             critic_val = self.critic(state)
             next_state, reward, done, _ = self.envs.step(
                                             action.cpu().numpy())

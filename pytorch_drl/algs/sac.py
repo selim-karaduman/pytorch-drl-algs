@@ -75,7 +75,9 @@ class SAC(ValueBased):
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         add_noise = (not test)
         with torch.no_grad():
+            self.policy_net.eval()
             action, _ = self.policy_net(state, add_noise)
+            self.policy_net.train()
         action = action.squeeze(0).detach().cpu().numpy()
         action = misc.tanh_expand(self.min_act, self.max_act, action)
         return action

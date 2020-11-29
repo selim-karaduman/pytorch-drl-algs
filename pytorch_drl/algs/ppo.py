@@ -34,7 +34,6 @@ class PPO(ActorCritic):
 
         self.gail = gail
         self.use_gae = use_gae
-        self.on_policy_updates = False
         self.epsilon = LinearSchedule(epsilon_init, 
                                         epsilon_final, epsilon_horizon)
         self.gamma = gamma
@@ -69,9 +68,9 @@ class PPO(ActorCritic):
         action = self.convert_to_numpy(action)
         return action
      
-    def _sample_action(self, state, grad):
+    def _sample_action(self, state):
             # Assumes only actor_critic combined models will be used
-            with torch.set_grad_enabled(grad):
+            with torch.no_grad():
                 actor_dist, critic_val = self.actor_critic(state)
             action = actor_dist.sample()
             log_prob = actor_dist.log_prob(action)
@@ -85,12 +84,12 @@ class PPO(ActorCritic):
         actions = []
         rewards = []
         dones = []
-        values = []        
+        values = []
         state = self.cur_tr_step
         for i in range(tmax):
             state = torch.from_numpy(state).float().to(device)
             action, log_prob, critic_val, a_dist = \
-                self._sample_action(state, grad=self.on_policy_updates)
+                self._sample_action(state)
             next_state, reward, done, _ = self.envs.step(
                                             action.cpu().numpy())
             log_probs.append(log_prob)
