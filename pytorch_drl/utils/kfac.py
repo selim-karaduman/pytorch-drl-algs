@@ -14,7 +14,8 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 """
 
-# From: https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail/blob/master/a2c_ppo_acktr/algo/kfac.py
+# From: https://github.com/ikostrikov/
+#   pytorch-a2c-ppo-acktr-gail/blob/master/a2c_ppo_acktr/algo/kfac.py
 
 import math
 
@@ -24,7 +25,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-# From: https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail/blob/master/a2c_ppo_acktr/utils.py
+# From: https://github.com/ikostrikov/
+#   pytorch-a2c-ppo-acktr-gail/blob/master/a2c_ppo_acktr/utils.py
 class AddBias(nn.Module):
     def __init__(self, bias):
         super(AddBias, self).__init__()
@@ -211,7 +213,8 @@ class KFACOptimizer(optim.Optimizer):
         for module in self.model.modules():
             classname = module.__class__.__name__
             if classname in self.known_modules:
-                assert not ((classname in ['Linear', 'Conv2d']) and module.bias is not None), \
+                assert not ((classname in ['Linear', 'Conv2d']) and 
+                             module.bias is not None), \
                                     "You must have a bias as a separate layer"
 
                 self.modules.append(module)

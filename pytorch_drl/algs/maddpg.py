@@ -6,11 +6,7 @@ import numpy as np
 import random
 from collections import deque
 import torch.nn.functional as F
-from pytorch_drl.utils.schedule import *
-from pytorch_drl.utils.loss import *
-from pytorch_drl.utils.parallel_env import *
-from pytorch_drl.utils.exploration import *
-from pytorch_drl.utils.model_utils import *
+import pytorch_drl.utils.model_utils as model_utils
 from pytorch_drl.utils.memory.buffer import MABuffer
 
 """
@@ -106,7 +102,8 @@ class _DDPG:
         value_loss = (TD_error).pow(2).mean()
         self.val_optimizer.zero_grad()
         (value_loss).backward()
-        nn.utils.clip_grad_norm_(self.value_net.parameters(), self.max_grad_norm)
+        nn.utils.clip_grad_norm_(self.value_net.parameters(), 
+                                    self.max_grad_norm)
         self.val_optimizer.step()
 
         cur_action = self.act(states[self.id], grad=True, batched=True, 
@@ -118,7 +115,8 @@ class _DDPG:
         policy_loss = -(self.value_net(xa).mean())
         self.pol_optimizer.zero_grad()
         policy_loss.backward()
-        nn.utils.clip_grad_norm_(self.policy_net.parameters(), self.max_grad_norm)
+        nn.utils.clip_grad_norm_(self.policy_net.parameters(),
+                                    self.max_grad_norm)
         self.pol_optimizer.step()
 
     
@@ -198,9 +196,9 @@ class MADDPG:
                         batch = self.buffer.sample()
                         agent.learn(batch, self.agents)
                     for agent in self.agents:
-                        soft_update_model(agent.value_net, 
+                        model_utils.soft_update_model(agent.value_net, 
                             agent.value_net_target, self.tau)
-                        soft_update_model(agent.policy_net, 
+                        model_utils.soft_update_model(agent.policy_net, 
                             agent.policy_net_target, self.tau)
                 if dones[0]:
                     break

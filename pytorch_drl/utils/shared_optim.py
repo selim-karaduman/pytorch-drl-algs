@@ -16,4 +16,5 @@ class AdamShared(torch.optim.Adam):
                 state['exp_avg'] = torch.zeros_like(p).share_memory_()
                 state['exp_avg_sq'] = torch.zeros_like(p).share_memory_()
                 if amsgrad:
-                    state['max_exp_avg_sq'] = torch.zeros_like(p).share_memory_()
+                    state['max_exp_avg_sq'] = torch.zeros_like(p)\
+                                                .share_memory_()

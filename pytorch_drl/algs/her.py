@@ -6,7 +6,9 @@ import gym
 import numpy as np
 from collections import deque
 
-
+"""
+Works only for DQN without PER
+"""
 class HER:
 
     def __init__(self, env, agent):

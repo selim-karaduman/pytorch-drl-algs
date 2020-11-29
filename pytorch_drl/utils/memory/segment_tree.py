@@ -34,7 +34,7 @@ class SegmentTree(object):
     def __getitem__(self, ind):
         return self.segment_tree[self.internal_offset + ind]
 
-#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------
 
 class SumTree(SegmentTree):
     def __init__(self, size):
@@ -66,7 +66,7 @@ class SumTree(SegmentTree):
         return s
 
 
-#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------
 
 class MinTree(SegmentTree):
 

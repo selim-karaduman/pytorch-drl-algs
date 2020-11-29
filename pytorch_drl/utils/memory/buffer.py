@@ -7,7 +7,8 @@ from collections import deque, namedtuple
 from pytorch_drl.utils.memory.segment_tree import SumTree, MinTree
 
 class UniformBuffer:
-    def __init__(self, size, batch_size, seed, device, action_type=torch.long):
+    def __init__(self, size, batch_size, 
+                    seed, device, action_type=torch.long):
         self.size = size
         self.batch_size = batch_size
         self.seed = random.seed(seed)
@@ -27,7 +28,8 @@ class UniformBuffer:
 
     def sample(self):
         device = self.device
-        idx = np.random.choice(len(self.buffer), self.batch_size, replace=False)
+        idx = np.random.choice(len(self.buffer), 
+                                self.batch_size, replace=False)
         states = []
         actions = []
         rewards = []
@@ -43,17 +45,20 @@ class UniformBuffer:
             dones.append(exp.done)
 
         states = torch.from_numpy(np.vstack(states)).float().to(device)
-        actions = torch.from_numpy(np.vstack(actions)).type(self.action_type).to(device)
+        actions = torch.from_numpy(np.vstack(actions))\
+                    .type(self.action_type).to(device)
         rewards = torch.from_numpy(np.vstack(rewards)).float().to(device)
-        next_states = torch.from_numpy(np.vstack(next_states)).float().to(device)
-        dones = torch.from_numpy(np.vstack(dones).astype(np.uint8)).float().to(device)
+        next_states = torch.from_numpy(np.vstack(next_states))\
+                        .float().to(device)
+        dones = torch.from_numpy(np.vstack(dones).astype(np.uint8))\
+                    .float().to(device)
 
         return states, actions, rewards, next_states, dones
         
     def __len__(self):
         return len(self.buffer)
         
-#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------
 
 class PriorityBuffer(UniformBuffer):
 
@@ -107,10 +112,13 @@ class PriorityBuffer(UniformBuffer):
             dones.append(exp.done)
         
         states = torch.from_numpy(np.vstack(states)).float().to(device)
-        actions = torch.from_numpy(np.vstack(actions)).type(self.action_type).to(device)
+        actions = torch.from_numpy(np.vstack(actions))\
+                    .type(self.action_type).to(device)
         rewards = torch.from_numpy(np.vstack(rewards)).float().to(device)
-        next_states = torch.from_numpy(np.vstack(next_states)).float().to(device)
-        dones = torch.from_numpy(np.vstack(dones).astype(np.uint8)).float().to(device)
+        next_states = torch.from_numpy(np.vstack(next_states))\
+                        .float().to(device)
+        dones = torch.from_numpy(np.vstack(dones).astype(np.uint8))\
+                    .float().to(device)
         indices = torch.from_numpy(np.array(indices)).to(device)
         weights = torch.tensor(weights).float()
         
@@ -122,15 +130,17 @@ class PriorityBuffer(UniformBuffer):
         weights = (weights * len(self)) ** (-beta)
         weights = weights / max_weight
         weights = weights.unsqueeze(1).to(device)
-        return (states, actions, rewards, next_states, dones, indices, weights)
+        return (states, actions, rewards, 
+                    next_states, dones, indices, weights)
 
 
-#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------
 
 
 class EpisodicBuffer:
 
-    def __init__(self, size, seed, device, batch_size, action_type=torch.long):
+    def __init__(self, size, seed, device, 
+                    batch_size, action_type=torch.long):
         self.size = size
         self.seed = seed
         self.device = device
@@ -181,7 +191,7 @@ class EpisodicBuffer:
     def __len__(self):
         return len(self.buffer)
 
-#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------
 
 class MABuffer(UniformBuffer):
     def __init__(self, size, batch_size, 
@@ -190,7 +200,8 @@ class MABuffer(UniformBuffer):
     
     def sample(self):
         device = self.device
-        idx = np.random.choice(len(self.buffer), self.batch_size, replace=False)
+        idx = np.random.choice(len(self.buffer), 
+                                self.batch_size, replace=False)
         states = []
         actions = []
         rewards = []
@@ -207,8 +218,9 @@ class MABuffer(UniformBuffer):
 
         states = [torch.from_numpy(np.vstack(ag)).float().to(device)
                     for ag in list(zip(*states))]
-        actions = [torch.from_numpy(np.vstack(ag)).type(self.action_type).to(device)
-                    for ag in list(zip(*actions))]
+        actions = [torch.from_numpy(np.vstack(ag))\
+                    .type(self.action_type).to(device)
+                        for ag in list(zip(*actions))]
         rewards = [torch.from_numpy(np.vstack(ag)).float().to(device)
                     for ag in list(zip(*rewards))]
         next_states = [torch.from_numpy(np.vstack(ag)).float().to(device)

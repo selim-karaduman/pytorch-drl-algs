@@ -1,5 +1,6 @@
 """
-# From: https://github.com/dolhana/udacity-deep-reinforcement-learning/blob/master/pong/parallelEnv.py
+# From: https://github.com/dolhana/
+    udacity-deep-reinforcement-learning/blob/master/pong/parallelEnv.py
 
 MIT License
 
@@ -31,7 +32,8 @@ from abc import ABC, abstractmethod
 
 class CloudpickleWrapper(object):
     """
-    Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
+    Uses cloudpickle to serialize contents 
+        (otherwise multiprocessing tries to use pickle)
     """
 
     def __init__(self, x):
@@ -168,10 +170,16 @@ class ParallelEnv(VecEnv):
         self.closed = False
         nenvs = len(env_fns)
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-        self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-            for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
+        self.ps = [Process(target=worker, 
+                            args=(work_remote, 
+                                    remote, 
+                                    CloudpickleWrapper(env_fn)))
+                    for (work_remote, remote, env_fn) in 
+                        zip(self.work_remotes, self.remotes, env_fns)]
         for p in self.ps:
-            p.daemon = True # if the main process crashes, we should not cause things to hang
+            # if the main process crashes, 
+            #   we should not cause things to hang
+            p.daemon = True 
             p.start()
         for remote in self.work_remotes:
             remote.close()
