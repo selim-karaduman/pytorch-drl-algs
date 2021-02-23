@@ -1,5 +1,5 @@
 
-# pytorch_drl
+# pytorch-drl-algs
 ## Model Free Deep Reinforcement Learning Algorithms
 
 ## Algorithms:
